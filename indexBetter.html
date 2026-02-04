@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScheduleAI | Institutional Scheduling</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body { background-color: #0f172a; color: white; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; }
+    .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 15px; margin-bottom: 10px; }
+    .bot-msg { background: #1e293b; color: #cbd5e1; align-self: flex-start; }
+    .user-msg { background: #3b82f6; color: white; align-self: flex-end; }
+    .hidden { display: none; }
+
+    /* Custom scrollbar */
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+  </style>
+</head>
+
+<body class="min-h-screen">
+  <!-- Top Nav -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-2xl bg-blue-600 grid place-items-center font-bold">S</div>
+        <div>
+          <div class="text-lg font-semibold leading-tight">ScheduleAI</div>
+          <div class="text-xs text-slate-300">Institutional Scheduling Prototype</div>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-2">
+        <button id="navHome" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm">Home</button>
+        <button id="navChat" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm">Chat</button>
+        <button id="navAdmin" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm">Admin</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-6xl mx-auto px-4 py-10">
+    <!-- HERO -->
+    <section id="sectionHome" class="grid lg:grid-cols-2 gap-8 items-center">
+      <div class="space-y-5">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/15 border border-blue-500/30 text-blue-200 text-xs">
+          <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+          Prototype → Full Product Path
+        </div>
+
+        <h1 class="text-4xl md:text-6xl font-extrabold leading-tight">
+          Design Your Future
+          <span class="block text-slate-300">with AI-driven Scheduling</span>
+        </h1>
+
+        <p class="text-slate-300 max-w-xl">
+          This is a single-file prototype (frontend only). It simulates a student onboarding chat and a basic admin insight dashboard.
+          Next step is full-stack (auth + database + API).
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button id="initBtn" class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 font-semibold shadow-lg shadow-blue-600/20">
+            Initialize Connection
+          </button>
+          <button id="demoBtn" class="px-5 py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 font-semibold">
+            View Demo Admin Insights
+          </button>
+        </div>
+
+        <div class="text-xs text-slate-400">
+          Tip: after “Initialize Connection”, the spinner will show for 2 seconds to simulate a secure handshake.
+        </div>
+      </div>
+
+      <!-- Right Card -->
+      <div class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-sm font-semibold text-slate-200">Prototype Status</div>
+          <div class="text-xs px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">Online</div>
+        </div>
+
+        <div class="space-y-3 text-sm text-slate-300">
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+            <span>Frontend UI</span><span class="text-emerald-300 font-semibold">Done</span>
+          </div>
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+            <span>Chat Flow (Simulated)</span><span class="text-emerald-300 font-semibold">Done</span>
+          </div>
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+            <span>Backend API</span><span class="text-amber-300 font-semibold">Next</span>
+          </div>
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+            <span>Database + Auth</span><span class="text-amber-300 font-semibold">Next</span>
+          </div>
+        </div>
+
+        <div class="mt-6 text-xs text-slate-400">
+          “Brain” = backend API (Node/Express). “Memory” = database (Supabase/MongoDB).
+        </div>
+      </div>
+    </section>
+
+    <!-- CHAT -->
+    <section id="sectionChat" class="hidden mt-10">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Student Intake Chat</h2>
+        <button id="resetBtn" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm">
+          Reset Chat
+        </button>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- Chat Window -->
+        <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
+          <div class="px-5 py-4 border-b border-white/10 bg-slate-900/40 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="h-8 w-8 rounded-xl bg-blue-600 grid place-items-center font-bold text-sm">AI</div>
+              <div>
+                <div class="font-semibold leading-tight">ScheduleAI Assistant</div>
+                <div class="text-xs text-slate-300">Secure Student Onboarding</div>
+              </div>
+            </div>
+            <div class="text-xs px-2 py-1 rounded-full bg-blue-600/15 border border-blue-500/30 text-blue-200">Prototype</div>
+          </div>
+
+          <div id="chatLog" class="p-5 h-[420px] flex flex-col gap-2 overflow-y-auto custom-scroll"></div>
+
+          <div class="p-4 border-t border-white/10 bg-slate-900/30">
+            <form id="chatForm" class="flex gap-2">
+              <input
+                id="chatInput"
+                type="text"
+                placeholder="Type your answer..."
+                class="flex-1 px-4 py-3 rounded-2xl bg-slate-950/60 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                autocomplete="off"
+              />
+              <button
+                type="submit"
+                class="px-4 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 font-semibold"
+              >
+                Send
+              </button>
+            </form>
+            <div id="chatHint" class="mt-2 text-xs text-slate-400"></div>
+          </div>
+        </div>
+
+        <!-- Summary Panel -->
+        <div class="rounded-3xl border border-white/10 bg-white/5 p-5">
+          <div class="text-sm font-semibold text-slate-200 mb-3">Captured Data (Local)</div>
+
+          <div class="space-y-3 text-sm">
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+              <div class="text-xs text-slate-400">Montclair ID</div>
+              <div id="sumId" class="font-semibold text-slate-200">—</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+              <div class="text-xs text-slate-400">Name</div>
+              <div id="sumName" class="font-semibold text-slate-200">—</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+              <div class="text-xs text-slate-400">Major</div>
+              <div id="sumMajor" class="font-semibold text-slate-200">—</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+              <div class="text-xs text-slate-400">Preferred Time</div>
+              <div id="sumTime" class="font-semibold text-slate-200">—</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+              <div class="text-xs text-slate-400">Courses</div>
+              <div id="sumCourses" class="font-semibold text-slate-200">—</div>
+            </div>
+          </div>
+
+          <div class="mt-5 text-xs text-slate-400">
+            Note: this file doesn’t save anywhere yet. In full-stack, you’d POST this object to your backend API.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="sectionAdmin" class="hidden mt-10">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Admin Dashboard (Demo)</h2>
+        <button id="refreshInsightsBtn" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm">
+          Refresh Insights
+        </button>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- Heatmap -->
+        <div class="lg:col-span-2 rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <div class="text-sm font-semibold text-slate-200">Demand Heatmap</div>
+              <div class="text-xs text-slate-400">Click a cell to see details</div>
+            </div>
+            <div class="text-xs px-2 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">
+              Demo Data
+            </div>
+          </div>
+
+          <div id="heatmap" class="grid grid-cols-5 gap-2"></div>
+
+          <div class="mt-4 text-xs text-slate-400">
+            Full-stack version: heatmap is generated from real DB aggregates (GET /api/insights).
+          </div>
+        </div>
+
+        <!-- Details -->
+        <div class="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div class="text-sm font-semibold text-slate-200 mb-3">Cell Details</div>
+
+          <div id="cellDetails" class="text-sm text-slate-300 space-y-2">
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+              Click a heatmap cell to view insights.
+            </div>
+          </div>
+
+          <div class="mt-5 text-xs text-slate-400">
+            This panel simulates admin drill-down (e.g., which course/time combos are most demanded).
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Loading Overlay (hidden by default) -->
+  <div id="loadingOverlay" class="fixed inset-0 hidden items-center justify-center bg-slate-950/80 z-50">
+    <div class="flex flex-col items-center gap-4">
+      <div class="h-14 w-14 rounded-full border-4 border-white/30 border-t-white animate-spin"></div>
+      <div class="text-center">
+        <p class="text-lg font-semibold">Connecting to MSU Servers...</p>
+        <p class="text-sm text-slate-300">Initializing secure session</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // Navigation
+    // =========================
+    const sectionHome = document.getElementById("sectionHome");
+    const sectionChat = document.getElementById("sectionChat");
+    const sectionAdmin = document.getElementById("sectionAdmin");
+
+    const navHome = document.getElementById("navHome");
+    const navChat = document.getElementById("navChat");
+    const navAdmin = document.getElementById("navAdmin");
+
+    function showSection(which) {
+      sectionHome.classList.add("hidden");
+      sectionChat.classList.add("hidden");
+      sectionAdmin.classList.add("hidden");
+
+      if (which === "home") sectionHome.classList.remove("hidden");
+      if (which === "chat") sectionChat.classList.remove("hidden");
+      if (which === "admin") sectionAdmin.classList.remove("hidden");
+
+      // scroll top
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    navHome.addEventListener("click", () => showSection("home"));
+    navChat.addEventListener("click", () => showSection("chat"));
+    navAdmin.addEventListener("click", () => showSection("admin"));
+
+    // =========================
+    // Loading Spinner Helpers
+    // =========================
+    function showLoading(message = "Connecting to MSU Servers...") {
+      const overlay = document.getElementById("loadingOverlay");
+      const msg = overlay.querySelector("p");
+      msg.textContent = message;
+
+      overlay.classList.remove("hidden");
+      overlay.classList.add("flex");
+    }
+
+    function hideLoading() {
+      const overlay = document.getElementById("loadingOverlay");
+      overlay.classList.add("hidden");
+      overlay.classList.remove("flex");
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // =========================
+    // Initialize Connection Button
+    // =========================
+    const initBtn = document.getElementById("initBtn");
+    const demoBtn = document.getElementById("demoBtn");
+
+    initBtn.addEventListener("click", async () => {
+      // prevent double clicks
+      initBtn.disabled = true;
+      initBtn.classList.add("opacity-60", "cursor-not-allowed");
+
+      // 2-second loading simulation
+      showLoading("Connecting to MSU Servers...");
+      await wait(900);
+      showLoading("Verifying student session...");
+      await wait(1100);
+      hideLoading();
+
+      // start chat flow
+      showSection("chat");
+      startChat();
+
+      // keep disabled to mimic "session created"
+      // (you can re-enable if you want)
+    });
+
+    demoBtn.addEventListener("click", () => {
+      showSection("admin");
+      renderInsights();
+    });
+
+    // =========================
+    // Chat Logic (Prototype)
+    // =========================
+    const chatLog = document.getElementById("chatLog");
+    const chatForm = document.getElementById("chatForm");
+    const chatInput = document.getElementById("chatInput");
+    const chatHint = document.getElementById("chatHint");
+    const resetBtn = document.getElementById("resetBtn");
+
+    // Summary fields
+    const sumId = document.getElementById("sumId");
+    const sumName = document.getElementById("sumName");
+    const sumMajor = document.getElementById("sumMajor");
+    const sumTime = document.getElementById("sumTime");
+    const sumCourses = document.getElementById("sumCourses");
+
+    // captured "studentData" (local)
+    let studentData = {
+      montclairId: "",
+      name: "",
+      major: "",
+      preferredTime: "",
+      courses: []
+    };
+
+    // step-based chat
+    // 0: ID, 1: Name, 2: Major, 3: Time preference, 4: Courses, 5: Done
+    let step = 0;
+    let started = false;
+
+    const prompts = [
+      "Welcome to ScheduleAI. Please enter your Montclair ID (8 digits).",
+      "Thanks. What is your full name?",
+      "Great. What is your major? (Example: Computer Science)",
+      "What time do you prefer for classes? (Morning / Afternoon / Evening)",
+      "List the course codes you want (comma-separated). Example: CSIT111, MATH122",
+      "All set! Your preferences are captured (prototype only)."
+    ];
+
+    function addMessage(text, who = "bot") {
+      const wrap = document.createElement("div");
+      wrap.className = `flex ${who === "user" ? "justify-end" : "justify-start"}`;
+
+      const bubble = document.createElement("div");
+      bubble.className = `chat-bubble ${who === "user" ? "user-msg" : "bot-msg"}`;
+      bubble.textContent = text;
+
+      wrap.appendChild(bubble);
+      chatLog.appendChild(wrap);
+
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function updateSummary() {
+      sumId.textContent = studentData.montclairId || "—";
+      sumName.textContent = studentData.name || "—";
+      sumMajor.textContent = studentData.major || "—";
+      sumTime.textContent = studentData.preferredTime || "—";
+      sumCourses.textContent = (studentData.courses && studentData.courses.length)
+        ? studentData.courses.join(", ")
+        : "—";
+    }
+
+    function setHint(text) {
+      chatHint.textContent = text || "";
+    }
+
+    function startChat() {
+      if (started) return;
+      started = true;
+
+      // greet + first prompt
+      addMessage("Secure channel established ✅", "bot");
+      addMessage(prompts[0], "bot");
+      setHint("Montclair ID must be 8 digits (example: 12345678).");
+      chatInput.focus();
+    }
+
+    function normalizeCourseCode(code) {
+      // light cleanup for prototype
+      return code.trim().toUpperCase();
+    }
+
+    function validateMontclairId(id) {
+      return /^\d{8}$/.test(id);
+    }
+
+    function validateTimePref(t) {
+      const v = t.trim().toLowerCase();
+      return ["morning", "afternoon", "evening"].includes(v);
+    }
+
+    function handleStepResponse(input) {
+      const val = input.trim();
+
+      if (step === 0) {
+        if (!validateMontclairId(val)) {
+          addMessage("That ID doesn't look right. Please enter exactly 8 digits.", "bot");
+          setHint("Example: 12345678");
+          return;
+        }
+        studentData.montclairId = val;
+        step++;
+        addMessage(prompts[1], "bot");
+        setHint("Example: Harshvardhan Kumar Nimesh");
+        updateSummary();
+        return;
+      }
+
+      if (step === 1) {
+        if (val.length < 2) {
+          addMessage("Please enter your full name (at least 2 characters).", "bot");
+          return;
+        }
+        studentData.name = val;
+        step++;
+        addMessage(prompts[2], "bot");
+        setHint("Example: Computer Science");
+        updateSummary();
+        return;
+      }
+
+      if (step === 2) {
+        if (val.length < 2) {
+          addMessage("Please enter a valid major (at least 2 characters).", "bot");
+          return;
+        }
+        studentData.major = val;
+        step++;
+        addMessage(prompts[3], "bot");
+        setHint("Choose: Morning / Afternoon / Evening");
+        updateSummary();
+        return;
+      }
+
+      if (step === 3) {
+        if (!validateTimePref(val)) {
+          addMessage("Please choose one of: Morning, Afternoon, Evening.", "bot");
+          setHint("Type: Morning / Afternoon / Evening");
+          return;
+        }
+        studentData.preferredTime = val[0].toUpperCase() + val.slice(1).toLowerCase();
+        step++;
+        addMessage(prompts[4], "bot");
+        setHint("Example: CSIT111, MATH122, CSIT212");
+        updateSummary();
+        return;
+      }
+
+      if (step === 4) {
+        const parts = val.split(",").map(normalizeCourseCode).filter(Boolean);
+        if (parts.length === 0) {
+          addMessage("Please list at least one course code (comma-separated).", "bot");
+          return;
+        }
+        studentData.courses = parts;
+        updateSummary();
+
+        step++;
+        addMessage(prompts[5], "bot");
+        addMessage("✅ (In full-stack, this is where we would POST your data to /api/save-student.)", "bot");
+        setHint("You can reset chat anytime.");
+        return;
+      }
+    }
+
+    chatForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = chatInput.value;
+      if (!text.trim()) return;
+
+      addMessage(text, "user");
+      chatInput.value = "";
+
+      handleStepResponse(text);
+    });
+
+    resetBtn.addEventListener("click", () => {
+      chatLog.innerHTML = "";
+      studentData = { montclairId: "", name: "", major: "", preferredTime: "", courses: [] };
+      step = 0;
+      started = false;
+      updateSummary();
+      setHint("");
+
+      addMessage("Chat reset. Click 'Initialize Connection' to start again, or begin typing if already initialized.", "bot");
+      chatInput.focus();
+    });
+
+    // =========================
+    // Admin Insights (Demo Heatmap)
+    // =========================
+    const heatmap = document.getElementById("heatmap");
+    const cellDetails = document.getElementById("cellDetails");
+    const refreshInsightsBtn = document.getElementById("refreshInsightsBtn");
+
+    // Demo: 5x5 grid (courses x time blocks)
+    const labelsX = ["CSIT", "MATH", "ENG", "BIO", "BUS"];
+    const labelsY = ["8–10", "10–12", "12–2", "2–4", "4–6"];
+
+    // Create demo "demand" values
+    function getDemoDemand() {
+      // random but stable-ish per refresh
+      const grid = [];
+      for (let r = 0; r < 5; r++) {
+        const row = [];
+        for (let c = 0; c < 5; c++) {
+          row.push(Math.floor(10 + Math.random() * 90)); // 10..99
+        }
+        grid.push(row);
+      }
+      return grid;
+    }
+
+    let demandGrid = getDemoDemand();
+
+    function demandToClass(v) {
+      // Map demand to background intensity using tailwind classes
+      if (v >= 80) return "bg-blue-600/70 border-blue-400/50";
+      if (v >= 60) return "bg-blue-600/45 border-blue-400/40";
+      if (v >= 40) return "bg-blue-600/30 border-blue-400/30";
+      if (v >= 20) return "bg-blue-600/20 border-blue-400/20";
+      return "bg-blue-600/10 border-blue-400/15";
+    }
+
+    function renderInsights() {
+      heatmap.innerHTML = "";
+
+      // Top header row (blank + X labels)
+      const headerBlank = document.createElement("div");
+      headerBlank.className = "h-10";
+      heatmap.appendChild(headerBlank);
+
+      labelsX.forEach(lbl => {
+        const h = document.createElement("div");
+        h.className = "h-10 flex items-center justify-center text-xs text-slate-300";
+        h.textContent = lbl;
+        heatmap.appendChild(h);
+      });
+
+      // Rows: Y label + cells
+      labelsY.forEach((timeLbl, r) => {
+        // row label
+        const y = document.createElement("div");
+        y.className = "h-12 flex items-center justify-center text-xs text-slate-300";
+        y.textContent = timeLbl;
+        heatmap.appendChild(y);
+
+        // cells
+        labelsX.forEach((courseLbl, c) => {
+          const v = demandGrid[r][c];
+
+          const cell = document.createElement("button");
+          cell.className = `h-12 rounded-2xl border text-xs font-semibold text-white/90 hover:brightness-110 transition ${demandToClass(v)}`;
+          cell.textContent = v;
+
+          cell.addEventListener("click", () => {
+            cellDetails.innerHTML = `
+              <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+                <div class="text-xs text-slate-400">Department</div>
+                <div class="font-semibold text-slate-200">${courseLbl}</div>
+              </div>
+              <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+                <div class="text-xs text-slate-400">Time Block</div>
+                <div class="font-semibold text-slate-200">${timeLbl}</div>
+              </div>
+              <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+                <div class="text-xs text-slate-400">Estimated Demand</div>
+                <div class="font-semibold text-slate-200">${v} requests</div>
+              </div>
+              <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10 text-xs text-slate-300">
+                Demo insight: consider adding more sections or larger rooms for <span class="font-semibold text-slate-100">${courseLbl}</span> in the <span class="font-semibold text-slate-100">${timeLbl}</span> slot.
+              </div>
+            `;
+          });
+
+          heatmap.appendChild(cell);
+        });
+      });
+    }
+
+    refreshInsightsBtn.addEventListener("click", () => {
+      demandGrid = getDemoDemand();
+      renderInsights();
+      cellDetails.innerHTML = `
+        <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/10">
+          Click a heatmap cell to view insights.
+        </div>
+      `;
+    });
+
+    // =========================
+    // Initial state
+    // =========================
+    showSection("home");
+    updateSummary();
+    renderInsights(); // pre-render so admin view is ready if user clicks
+  </script>
+</body>
+</html>
