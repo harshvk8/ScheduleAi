@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>ScheduleAI | AI-Powered University Course Scheduling</title>
+    <meta name="title" content="ScheduleAI | AI-Powered University Course Scheduling">
+    <meta name="description" content="ScheduleAI helps students request ideal class times and professors while providing universities with real-time demand heatmaps.">
+    <meta name="keywords" content="university scheduling, course planner, AI schedule assistant, Montclair State University">
+    <meta name="robots" content="index, follow">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* BASE THEME & ASPIRATIONAL BACKGROUND */
+        body { background-color: #050b1a; color: white; font-family: sans-serif; scroll-behavior: smooth; overflow-x: hidden; }
+        
+        .bg-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% -10%, #1e40af 0%, transparent 60%);
+            z-index: -1; pointer-events: none;
+        }
+
+        /* PREMIUM ENTRANCE ANIMATIONS */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-hero { animation: fadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .delay-1 { animation-delay: 0.2s; opacity: 0; }
+        .delay-2 { animation-delay: 0.4s; opacity: 0; }
+
+        /* GLASSMORPHISM ELEMENTS */
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* DROPDOWN CORRECTIONS */
+        #university-select {
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        /* Makes the university names clear (Black text on white background) */
+        #university-select option {
+            background-color: white; 
+            color: black; 
+            padding: 10px;
+        }
+
+        #university-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+
+        /* BUTTON INTERACTION */
+        .btn-glow:not(:disabled) {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.4);
+            animation: pulse-blue 2s infinite;
+        }
+
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 15px; margin-bottom: 10px; }
+        .bot-msg { background: #1e293b; color: #cbd5e1; align-self: flex-start; }
+        .user-msg { background: #3b82f6; color: white; align-self: flex-end; }
+        .hidden { display: none; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+    <div class="bg-glow"></div>
+
+    <nav class="p-6 flex justify-between items-center sticky top-0 z-50 glass border-b-0">
+        <div class="text-xl font-bold tracking-tight cursor-pointer" onclick="location.reload()">
+            Schedule<span class="text-blue-500">AI</span>
+        </div>
+        <div class="space-x-8 text-xs uppercase tracking-widest font-semibold">
+            <button onclick="showSection('selection-screen')" class="hover:text-blue-400 transition">Portal</button>
+            <button onclick="showSection('pricing')" class="hover:text-blue-400 transition">Access</button>
+            <button onclick="showSection('admin-portal')" class="hover:text-blue-400 transition">Intelligence</button>
+        </div>
+    </nav>
+
+    <main id="selection-screen" class="section-content min-h-[85vh] flex flex-col items-center justify-center p-6 text-center">
+        <div class="animate-hero">
+            <h1 class="text-6xl md:text-8xl font-black mb-6 tracking-tighter leading-tight">
+                Design Your <br><span class="text-blue-500">Future.</span>
+            </h1>
+        </div>
+        
+        <div class="animate-hero delay-1 max-w-lg">
+            <p class="text-slate-400 text-lg md:text-xl mb-12 font-light leading-relaxed">
+                Empowering students to shape the next academic semester through AI-driven demand analysis.
+            </p>
+        </div>
+
+        <div class="animate-hero delay-2 w-full max-w-sm space-y-4">
+            <select id="university-select" class="glass w-full p-5 rounded-2xl outline-none cursor-pointer focus:border-blue-500 transition-all appearance-none text-center text-sm font-semibold tracking-widest uppercase">
+                <option value="" disabled selected>SELECT INSTITUTION</option>
+                <option value="MSU">Montclair State University</option>
+            </select>
+            
+            <button id="start-btn" class="btn-glow w-full bg-blue-600 hover:bg-blue-500 p-5 rounded-2xl font-bold tracking-widest uppercase text-xs transition-all opacity-50 cursor-not-allowed" disabled>
+                Initialize Connection
+            </button>
+        </div>
+    </main>
+
+    <main id="chat-screen" class="section-content hidden flex-grow flex flex-col max-w-2xl mx-auto w-full p-4 min-h-[60vh]">
+        <div id="chat-box" class="flex-grow overflow-y-auto flex flex-col p-6 bg-slate-900/50 border border-slate-700 rounded-t-xl space-y-4 h-96 custom-scroll"></div>
+        <div class="p-4 border-x border-b border-slate-700 bg-slate-800/50 rounded-b-xl flex gap-2">
+            <input type="text" id="user-input" placeholder="Type your response..." class="flex-grow bg-transparent outline-none p-2 text-white">
+            <button id="send-btn" class="bg-blue-600 px-6 py-2 rounded-lg font-bold">Send</button>
+        </div>
+    </main>
+
+    <section id="pricing" class="section-content hidden py-24 bg-slate-900/30">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">Choose Your Path</h2>
+                <p class="text-slate-400 italic">Select the account that fits your role at the university.</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                <div class="p-10 rounded-3xl glass flex flex-col shadow-xl">
+                    <h3 class="text-xl font-bold mb-2 text-blue-400">Student Account</h3>
+                    <div class="text-6xl font-extrabold mb-6">$0</div>
+                    <ul class="space-y-4 text-slate-400 mb-8 text-lg flex-grow">
+                        <li>✅ Request custom class times</li>
+                        <li>✅ Select preferred professors</li>
+                    </ul>
+                    <button onclick="showSection('selection-screen')" class="w-full py-4 bg-blue-600 rounded-xl font-bold hover:bg-blue-700 transition">Continue as Student</button>
+                </div>
+                <div class="p-10 rounded-3xl bg-emerald-900/10 border border-emerald-500/50 flex flex-col shadow-2xl">
+                    <h3 class="text-xl font-bold mb-2 text-emerald-400">Administrator</h3>
+                    <div class="text-3xl font-extrabold mb-6 italic text-white leading-tight">Institutional Access</div>
+                    <ul class="space-y-4 text-slate-300 mb-8 text-lg flex-grow">
+                        <li>✨ Student demand heatmaps</li>
+                        <li>✨ Optimize professor allocation</li>
+                    </ul>
+                    <div class="space-y-4">
+                        <a href="mailto:pricing@scheduleai.org" class="block text-center w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition">Email: pricing@scheduleai.org</a>
+                        <button onclick="showSection('admin-portal')" class="w-full text-xs text-emerald-400 hover:underline">Already have an account? Login</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="admin-portal" class="section-content hidden py-24 bg-slate-900 border-t border-slate-800">
+        <div class="max-w-6xl mx-auto px-6">
+            <div id="admin-init" class="max-w-md mx-auto p-8 bg-slate-800 rounded-3xl border border-slate-700 text-center">
+                <h2 class="text-2xl font-bold mb-6">Administrator Portal</h2>
+                <button onclick="showLoginForm()" class="w-full bg-slate-700 p-4 rounded-xl font-bold hover:bg-slate-600 transition">Click to Login</button>
+            </div>
+            <div id="admin-login-form" class="hidden max-w-md mx-auto p-8 bg-slate-800 rounded-3xl border border-slate-700">
+                <h2 class="text-2xl font-bold mb-6 text-center">Admin Sign In</h2>
+                <input type="text" id="admin-user" placeholder="Username (admin)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 mb-4 outline-none focus:ring-2 focus:ring-emerald-500">
+                <input type="password" id="admin-pass" placeholder="Password (msu2026)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-700 mb-4 outline-none focus:ring-2 focus:ring-emerald-500">
+                <button onclick="attemptLogin()" class="w-full bg-emerald-600 p-4 rounded-xl font-bold hover:bg-emerald-700 transition">Enter Dashboard</button>
+            </div>
+            <div id="admin-dashboard" class="hidden bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden shadow-2xl">
+                <div class="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center text-xs">
+                    <h3 class="font-bold text-emerald-400 italic uppercase">Dashboard // Live Insights</h3>
+                    <button onclick="location.reload()" class="bg-slate-700 px-3 py-1 rounded hover:bg-slate-600 transition">Reset All</button>
+                </div>
+                <div class="flex flex-col lg:flex-row h-[500px]">
+                    <div id="insights-panel" class="w-full overflow-y-auto custom-scroll p-6 space-y-4 bg-slate-800"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // NAVIGATION LOGIC
+        function showSection(sectionId) {
+            document.querySelectorAll('.section-content').forEach(section => section.classList.add('hidden'));
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        // CHAT LOGIC
+        const select = document.getElementById('university-select');
+        const startBtn = document.getElementById('start-btn');
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        let step = 0;
+
+        select.addEventListener('change', () => { 
+            if(select.value === "MSU") { 
+                startBtn.disabled = false; 
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed'); 
+            } 
+        });
+
+        startBtn.addEventListener('click', () => {
+            showSection('chat-screen');
+            addMessage("bot", "Hello! I am your ScheduleAI assistant for Montclair State. To help us optimize the Fall 2026 schedule, what is your <b>First Name</b>?");
+        });
+
+        function handleSend() {
+            const text = userInput.value.trim();
+            if (!text) return;
+            addMessage("user", text);
+            userInput.value = '';
+            setTimeout(() => {
+                if (step === 0) { addMessage("bot", "What is your <b>Last Name</b>?"); step++; }
+                else if (step === 1) { addMessage("bot", "Enter your <b>Montclair ID</b>:"); step++; }
+                else if (step === 2) { addMessage("bot", "What <b>course</b> do you need to schedule?"); step++; }
+                else if (step === 3) { addMessage("bot", "Which <b>Professor</b> is your first choice?"); step++; }
+                else if (step === 4) { addMessage("bot", "What <b>time</b> works best for you? (e.g., 10 AM)"); step++; }
+                else if (step === 5) { addMessage("bot", "Thank you. Your preference has been added to the demand heatmap for review."); step++; }
+            }, 600);
+        }
+
+        function addMessage(sender, text) {
+            const div = document.createElement('div');
+            div.className = `chat-bubble ${sender === 'bot' ? 'bot-msg' : 'user-msg'} animate-hero`;
+            div.innerHTML = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') handleSend(); });
+
+        // ADMIN LOGIC
+        function showLoginForm() { 
+            document.getElementById('admin-init').classList.add('hidden'); 
+            document.getElementById('admin-login-form').classList.remove('hidden'); 
+        }
+
+        function attemptLogin() {
+            const u = document.getElementById('admin-user').value;
+            const p = document.getElementById('admin-pass').value;
+            if(u === "admin" && p === "msu2026") {
+                document.getElementById('admin-login-form').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                renderInsights([{ class: "CSIT 111", prof: "Smith", time: "10 AM", day: "Mon", count: 42 }]);
+            } else { alert("Try admin / msu2026"); }
+        }
+
+        function renderInsights(data) {
+            const panel = document.getElementById('insights-panel');
+            panel.innerHTML = "";
+            data.forEach(req => {
+                panel.innerHTML += `<div class="p-4 bg-slate-900 rounded-xl border-l-4 border-blue-500 shadow-lg animate-hero"><span class="font-bold text-sm">${req.class}</span><p class='text-xs text-slate-400'>${req.count} students requested ${req.prof}</p></div>`;
+            });
+        }
+    </script>
+</body>
+
+<!-- Loading Overlay (hidden by default) -->
+<div id="loadingOverlay" class="fixed inset-0 hidden items-center justify-center bg-slate-950/80 z-50">
+  <div class="flex flex-col items-center gap-4">
+    <div class="h-14 w-14 rounded-full border-4 border-white/30 border-t-white animate-spin"></div>
+    <div class="text-center">
+      <p class="text-lg font-semibold">Connecting to MSU Servers...</p>
+      <p class="text-sm text-slate-300">Initializing secure session</p>
+    </div>
+  </div>
+</div>
+
+</html>
