@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import { saveCalendarEvents, deleteCalendarEventsBySession, getOrCreateSessionId } from '@/lib/db';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -282,6 +283,10 @@ export default function NormalUserPage() {
         const { events: newEvts, response } = parseMessage(text, prev);
         setMessages((msgs) => [...msgs, { role: 'assistant', text: response }]);
         setTyping(false);
+        if (newEvts.length > 0) {
+          const sessionId = getOrCreateSessionId();
+          saveCalendarEvents(sessionId, newEvts).catch(console.error);
+        }
         return [...prev, ...newEvts];
       });
     }, 500);
@@ -300,6 +305,8 @@ export default function NormalUserPage() {
       ...prev,
       { role: 'assistant', text: 'Done — I cleared your timetable. Start fresh!' },
     ]);
+    const sessionId = getOrCreateSessionId();
+    deleteCalendarEventsBySession(sessionId).catch(console.error);
   };
 
   const totalHeight = (GRID_END - GRID_START) * HOUR_PX;

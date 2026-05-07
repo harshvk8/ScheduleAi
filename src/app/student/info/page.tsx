@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { getUniversity } from '@/data/universities';
+import { saveUser } from '@/lib/db';
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ function StudentInfoForm() {
   const [email, setEmail] = useState('');
   const [studentId, setStudentId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   // Redirect back if no valid university in URL
   if (!university) {
@@ -132,7 +134,7 @@ function StudentInfoForm() {
     return e;
   };
 
-  const handleSubmit = (ev: React.FormEvent) => {
+  const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) {
@@ -140,18 +142,19 @@ function StudentInfoForm() {
       return;
     }
 
-    // Store profile in sessionStorage — Phase 5 will persist to database
-    sessionStorage.setItem(
-      'studentProfile',
-      JSON.stringify({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        studentId: studentId.trim().toUpperCase(),
-        universityId,
-        universityName: university.name,
-        domain: university.domain,
-      })
-    );
+    const profile = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      studentId: studentId.trim().toUpperCase(),
+      universityId,
+      universityName: university.name,
+      domain: university.domain,
+    };
+
+    sessionStorage.setItem('studentProfile', JSON.stringify(profile));
+
+    setSaving(true);
+    saveUser(profile).catch(console.error);
 
     router.push('/student/chatbot');
   };
@@ -248,9 +251,10 @@ function StudentInfoForm() {
             {/* Submit */}
             <button
               type="submit"
-              className="w-full mt-2 py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              disabled={saving}
+              className="w-full mt-2 py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Start chatbot
+              {saving ? 'Saving…' : 'Start chatbot'}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m9 18 6-6-6-6" />
               </svg>
@@ -258,7 +262,7 @@ function StudentInfoForm() {
           </form>
 
           <p className="mt-6 text-xs text-slate-600 text-center leading-relaxed">
-            Your data stays in your browser for now. Real authentication comes in Phase 10.
+            Your profile is saved to the database. Real authentication comes in Phase 10.
           </p>
         </div>
       </main>

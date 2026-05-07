@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import { saveScheduleRequest } from '@/lib/db';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -419,6 +420,26 @@ export default function StudentChatbotPage() {
           { role: 'bot', text: `Perfect! Here's everything I've captured — take a look at your preferences on the right. Your profile is ready to match against available sections.` },
         ]);
         setIsDone(true);
+        // Persist to Firestore (fire-and-forget)
+        if (profile) {
+          const stored = sessionStorage.getItem('studentProfile');
+          const sp = stored ? JSON.parse(stored) : {};
+          saveScheduleRequest(
+            profile.email,
+            profile.name,
+            sp.universityId ?? '',
+            profile.universityName,
+            {
+              courses: prefs.courses,
+              constraints: prefs.constraints,
+              generalPreferTimes: prefs.generalPreferTimes,
+              generalAvoidTimes: prefs.generalAvoidTimes,
+              generalPreferDays: prefs.generalPreferDays,
+              generalAvoidDays: prefs.generalAvoidDays,
+              defaultModality: prefs.defaultModality,
+            }
+          ).catch(console.error);
+        }
       }, 700);
       return;
     }
