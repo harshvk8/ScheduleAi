@@ -3,17 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-
-const UNIVERSITIES = [
-  { id: 'msu', name: 'Montclair State University', location: 'Montclair, NJ', domain: 'montclair.edu' },
-  { id: 'rutgers', name: 'Rutgers University', location: 'New Brunswick, NJ', domain: 'rutgers.edu' },
-  { id: 'njit', name: 'New Jersey Institute of Technology', location: 'Newark, NJ', domain: 'njit.edu' },
-  { id: 'kean', name: 'Kean University', location: 'Union, NJ', domain: 'kean.edu' },
-  { id: 'rowan', name: 'Rowan University', location: 'Glassboro, NJ', domain: 'rowan.edu' },
-  { id: 'nyu', name: 'New York University', location: 'New York, NY', domain: 'nyu.edu' },
-  { id: 'columbia', name: 'Columbia University', location: 'New York, NY', domain: 'columbia.edu' },
-  { id: 'fordham', name: 'Fordham University', location: 'Bronx, NY', domain: 'fordham.edu' },
-];
+import { UNIVERSITIES } from '@/data/universities';
 
 export default function StudentPage() {
   const [search, setSearch] = useState('');
