@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   setDoc,
+  getDoc,
   addDoc,
   deleteDoc,
   writeBatch,
@@ -240,4 +241,78 @@ export function getOrCreateSessionId(): string {
     sessionStorage.setItem(key, id);
   }
   return id;
+}
+
+// ─── Admin query types ────────────────────────────────────────────────────────
+
+export interface ScheduleRequestDoc {
+  id: string;
+  studentEmail: string;
+  studentName: string;
+  universityId: string;
+  universityName: string;
+  courses: CoursePreference[];
+  constraints: ScheduleConstraint[];
+  generalPreferTimes: string[];
+  generalAvoidTimes: string[];
+  generalPreferDays: string[];
+  generalAvoidDays: string[];
+  defaultModality: string | null;
+  status: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  submittedAt: any;
+}
+
+export interface UniversityDoc {
+  id: string;
+  name: string;
+  domain: string;
+  studentCount: number;
+}
+
+// ─── Admin queries ────────────────────────────────────────────────────────────
+
+export async function getAllScheduleRequests(): Promise<ScheduleRequestDoc[]> {
+  const snap = await getDocs(collection(db, COL.scheduleRequests));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ScheduleRequestDoc));
+}
+
+export async function getAllUniversities(): Promise<UniversityDoc[]> {
+  const snap = await getDocs(collection(db, COL.universities));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as UniversityDoc));
+}
+
+// ─── Admin accounts ───────────────────────────────────────────────────────────
+
+export interface AdminAccount {
+  id: string;
+  name: string;
+  email: string;
+  universityName: string;
+  password: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createdAt: any;
+}
+
+export async function createAdminAccount(account: {
+  name: string;
+  email: string;
+  universityName: string;
+  password: string;
+}): Promise<void> {
+  const docId = emailToDocId(account.email);
+  await setDoc(doc(db, COL.adminAccounts, docId), {
+    name: account.name,
+    email: account.email.toLowerCase(),
+    universityName: account.universityName,
+    password: account.password,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getAdminAccount(email: string): Promise<AdminAccount | null> {
+  const docId = emailToDocId(email);
+  const snap = await getDoc(doc(db, COL.adminAccounts, docId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as AdminAccount;
 }

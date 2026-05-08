@@ -4,7 +4,8 @@
       "Bash(npx tsc *)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\" -Force)",
       "Bash(Select-Object Name, FullName)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npm run *)"
     ]
   }
 }
