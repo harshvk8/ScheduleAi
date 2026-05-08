@@ -282,6 +282,23 @@ export async function getAllUniversities(): Promise<UniversityDoc[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as UniversityDoc));
 }
 
+export interface ProfessorFeedbackDoc {
+  id: string;
+  professorName: string;
+  courseName: string;
+  universityId: string;
+  rating: number | null;
+  comment: string | null;
+  studentEmail: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  submittedAt: any;
+}
+
+export async function getAllProfessorFeedback(): Promise<ProfessorFeedbackDoc[]> {
+  const snap = await getDocs(collection(db, COL.professorFeedback));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessorFeedbackDoc));
+}
+
 // ─── Admin accounts ───────────────────────────────────────────────────────────
 
 export interface AdminAccount {

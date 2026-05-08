@@ -7,12 +7,23 @@ export default function Home() {
       {/* Header */}
       <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
         <Logo />
-        <Link
-          href="/admin"
-          className="px-4 py-2 text-sm text-slate-400 border border-white/10 rounded-lg hover:bg-white/5 hover:text-white hover:border-white/20 transition-all duration-200"
-        >
-          Admin Login
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/professors"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-400 border border-white/10 rounded-lg hover:bg-white/5 hover:text-white hover:border-white/20 transition-all duration-200"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            Find Professors
+          </Link>
+          <Link
+            href="/admin"
+            className="px-4 py-2 text-sm text-slate-400 border border-white/10 rounded-lg hover:bg-white/5 hover:text-white hover:border-white/20 transition-all duration-200"
+          >
+            Admin Login
+          </Link>
+        </div>
       </header>
 
       {/* Hero */}
