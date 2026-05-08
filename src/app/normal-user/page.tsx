@@ -3,19 +3,24 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { saveCalendarEvents, deleteCalendarEventsBySession, getOrCreateSessionId } from '@/lib/db';
+import { fetchWeekEvents, gcalToInternal, createGCalEvent, deleteGCalEvent } from '@/lib/googleCalendar';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type EventCategory = 'work' | 'study' | 'personal' | 'class' | 'routine';
 
 interface ScheduleEvent {
   id: string;
   day: string;
-  startMinutes: number; // minutes from midnight
+  startMinutes: number;
   endMinutes: number;
   title: string;
   category: EventCategory;
+  source?: 'google';       // undefined = manually added
+  googleEventId?: string;  // present when source === 'google'
+  hasConflict?: boolean;   // overlaps with another event on the same day
 }
 
 interface ChatMessage {
@@ -30,7 +35,7 @@ const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const GRID_START = 6;  // 6 AM
 const GRID_END = 23;   // 11 PM
-const HOUR_PX = 56;    // pixels per hour
+const HOUR_PX = 56;
 
 const HOURS = Array.from({ length: GRID_END - GRID_START }, (_, i) => GRID_START + i);
 
@@ -97,6 +102,21 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ─── Conflict detection ───────────────────────────────────────────────────────
+
+function detectConflicts(evs: ScheduleEvent[]): ScheduleEvent[] {
+  return evs.map((ev) => ({
+    ...ev,
+    hasConflict: evs.some(
+      (other) =>
+        other.id !== ev.id &&
+        other.day === ev.day &&
+        ev.startMinutes < other.endMinutes &&
+        ev.endMinutes > other.startMinutes
+    ),
+  }));
+}
+
 // ─── Natural Language Parser ──────────────────────────────────────────────────
 
 function parseMessage(
@@ -105,7 +125,6 @@ function parseMessage(
 ): { events: ScheduleEvent[]; response: string } {
   const lower = msg.toLowerCase();
 
-  // 1. Extract mentioned days
   const days = Object.entries(DAY_MAP)
     .filter(([alias]) => new RegExp(`\\b${alias}\\b`).test(lower))
     .map(([, day]) => day)
@@ -114,15 +133,13 @@ function parseMessage(
   if (days.length === 0) {
     return {
       events: [],
-      response:
-        "Which day is this for? Try something like \"I work Monday from 9 AM to 5 PM\".",
+      response: 'Which day is this for? Try something like "I work Monday from 9 AM to 5 PM".',
     };
   }
 
   const created: ScheduleEvent[] = [];
   const descriptions: string[] = [];
 
-  // Helper to push an event for each day
   const addEvent = (title: string, start: number, end: number, forDays = days) => {
     const category = detectCategory(title);
     for (const day of forDays) {
@@ -131,7 +148,7 @@ function parseMessage(
     }
   };
 
-  // ── Pattern A: "X from HH to HH" (handles multiple in one message) ──────
+  // Pattern A: "X from HH to HH"
   const rangeRe = /([a-zA-Z][a-zA-Z\s]*?)\s+from\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+to\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
   let rm: RegExpExecArray | null;
 
@@ -144,7 +161,6 @@ function parseMessage(
       })
       .trim();
 
-    // Skip pure day words that leaked in
     if (!rawTitle || Object.keys(DAY_MAP).includes(rawTitle.toLowerCase())) continue;
 
     const start = parseTimeStr(rm[2]);
@@ -155,31 +171,27 @@ function parseMessage(
     addEvent(title || 'Event', start, end);
   }
 
-  // ── Pattern B: "study/do X after work" ──────────────────────────────────
+  // Pattern B: "study/do X after work"
   const afterWorkRe = /\b(?:study|learn|do|work on|practice|code)\s+([a-zA-Z][a-zA-Z0-9\s]*?)(?=\s+after\s+work|\s+afterwards)/i;
   const afterWorkMatch = afterWorkRe.exec(msg);
 
   if (afterWorkMatch) {
     const subject = capitalize(afterWorkMatch[1].trim());
-
-    // Find latest work end from newly created or existing events on mentioned days
     const allSoFar = [...existing, ...created];
     const workEnd = allSoFar
       .filter((e) => e.category === 'work' && days.includes(e.day))
       .sort((a, b) => b.endMinutes - a.endMinutes)[0]?.endMinutes;
 
     if (workEnd !== undefined) {
-      const start = workEnd + 60;      // 1 h buffer
-      const end = start + 120;         // 2 h study block
+      const start = workEnd + 60;
+      const end = start + 120;
       const title = subject.toLowerCase().startsWith('study') ? subject : `Study ${subject}`;
-
-      // Only add if not already covered by pattern A
       const alreadyCovered = created.some((e) => e.title === title);
       if (!alreadyCovered) addEvent(title, start, end);
     }
   }
 
-  // ── Pattern C: "X at HH [for N hours]" ───────────────────────────────────
+  // Pattern C: "X at HH [for N hours]"
   if (created.length === 0) {
     const atRe = /([a-zA-Z][a-zA-Z\s]*?)\s+(?:at|@)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s+for\s+(\d+(?:\.\d+)?)\s*(?:hour|hr)s?)?/gi;
     let am: RegExpExecArray | null;
@@ -206,8 +218,7 @@ function parseMessage(
   if (descriptions.length === 0) {
     return {
       events: [],
-      response:
-        "I need a specific time to add that. Try: \"I work Monday from 9 AM to 5 PM\" or \"Add gym Tuesday at 7 AM for 1 hour\".",
+      response: 'I need a specific time for that. Try: "I work Monday from 9 AM to 5 PM" or "Add gym Tuesday at 7 AM for 1 hour".',
     };
   }
 
@@ -217,7 +228,7 @@ function parseMessage(
   };
 }
 
-// ─── Event block (absolutely positioned in grid column) ───────────────────────
+// ─── Event block ──────────────────────────────────────────────────────────────
 
 function EventBlock({ event }: { event: ScheduleEvent }) {
   const s = CAT_STYLE[event.category];
@@ -226,11 +237,30 @@ function EventBlock({ event }: { event: ScheduleEvent }) {
 
   return (
     <div
-      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-1 overflow-hidden cursor-default select-none ${s.bg} ${s.border}`}
+      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-1 overflow-hidden cursor-default select-none
+        ${s.bg} ${s.border}
+        ${event.hasConflict ? 'ring-1 ring-orange-400/70' : ''}
+        ${event.source === 'google' ? 'border-dashed' : ''}
+      `}
       style={{ top, height }}
-      title={`${event.title} · ${fmt(event.startMinutes)} – ${fmt(event.endMinutes)}`}
+      title={[
+        `${event.title}`,
+        `${fmt(event.startMinutes)} – ${fmt(event.endMinutes)}`,
+        event.source === 'google' ? 'From Google Calendar' : '',
+        event.hasConflict ? '⚠ Scheduling conflict' : '',
+      ].filter(Boolean).join(' · ')}
     >
-      <p className={`text-xs font-semibold leading-tight truncate ${s.text}`}>{event.title}</p>
+      <div className="flex items-start gap-0.5 min-w-0">
+        <p className={`text-xs font-semibold leading-tight truncate flex-1 ${s.text}`}>
+          {event.title}
+        </p>
+        {event.hasConflict && (
+          <span className="shrink-0 text-orange-400 text-[10px] leading-none ml-0.5" title="Conflict">⚠</span>
+        )}
+        {event.source === 'google' && (
+          <span className="shrink-0 text-[9px] font-bold text-slate-500 leading-none ml-0.5 mt-px" title="Google Calendar">G</span>
+        )}
+      </div>
       {height > 32 && (
         <p className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
           {fmt(event.startMinutes)} – {fmt(event.endMinutes)}
@@ -240,7 +270,7 @@ function EventBlock({ event }: { event: ScheduleEvent }) {
   );
 }
 
-// ─── Legend ──────────────────────────────────────────────────────────────────
+// ─── Legend ───────────────────────────────────────────────────────────────────
 
 const LEGEND: { label: string; cat: EventCategory }[] = [
   { label: 'Work', cat: 'work' },
@@ -252,7 +282,7 @@ const LEGEND: { label: string; cat: EventCategory }[] = [
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function NormalUserPage() {
+function NormalUserPage() {
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -262,12 +292,122 @@ export default function NormalUserPage() {
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
+
+  // ── Google OAuth ──────────────────────────────────────────────────────────
+
+  const googleLogin = useGoogleLogin({
+    onSuccess: (res) => {
+      setGoogleToken(res.access_token);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'Connected to Google Calendar. Click "Import this week" to pull in your events, or "Export" to push your timetable to Google.',
+        },
+      ]);
+    },
+    onError: () => {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'Google Calendar connection failed. Please try again and allow calendar access.' },
+      ]);
+    },
+    scope: 'https://www.googleapis.com/auth/calendar',
+  });
+
+  const importFromGoogle = useCallback(async () => {
+    if (!googleToken) return;
+    setSyncing(true);
+    try {
+      const gcalEvents = await fetchWeekEvents(googleToken);
+      const mapped = gcalEvents
+        .map(gcalToInternal)
+        .filter((e): e is NonNullable<typeof e> => e !== null)
+        .map((e) => ({
+          id: uid(),
+          ...e,
+          category: detectCategory(e.title),
+          source: 'google' as const,
+        }));
+
+      setEvents((prev) => {
+        const internal = prev.filter((e) => e.source !== 'google');
+        const merged = detectConflicts([...internal, ...mapped]);
+        const conflictCount = merged.filter((e) => e.hasConflict).length;
+
+        setMessages((msgs) => [
+          ...msgs,
+          {
+            role: 'assistant',
+            text:
+              mapped.length === 0
+                ? 'No timed events found in Google Calendar for this week.'
+                : `Imported ${mapped.length} event${mapped.length !== 1 ? 's' : ''} from Google Calendar.${
+                    conflictCount > 0
+                      ? ` ⚠ ${conflictCount} scheduling conflict${conflictCount !== 1 ? 's' : ''} detected — highlighted in orange.`
+                      : ' No conflicts.'
+                  }`,
+          },
+        ]);
+
+        return merged;
+      });
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'Import failed. Your Google session may have expired — please reconnect.' },
+      ]);
+    } finally {
+      setSyncing(false);
+    }
+  }, [googleToken]);
+
+  const exportToGoogle = useCallback(async () => {
+    if (!googleToken) return;
+    setSyncing(true);
+    try {
+      const toExport = events.filter((e) => e.source !== 'google');
+      if (toExport.length === 0) {
+        setMessages((prev) => [...prev, { role: 'assistant', text: 'Nothing to export — add some events first.' }]);
+        setSyncing(false);
+        return;
+      }
+      await Promise.all(toExport.map((e) => createGCalEvent(googleToken, e)));
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: `Exported ${toExport.length} event${toExport.length !== 1 ? 's' : ''} to your Google Calendar.`,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'Export failed. Your Google session may have expired — please reconnect.' },
+      ]);
+    } finally {
+      setSyncing(false);
+    }
+  }, [googleToken, events]);
+
+  const disconnect = useCallback(() => {
+    setGoogleToken(null);
+    setEvents((prev) => detectConflicts(prev.filter((e) => e.source !== 'google')));
+    setMessages((prev) => [
+      ...prev,
+      { role: 'assistant', text: 'Disconnected from Google Calendar. Google events removed from view.' },
+    ]);
+  }, []);
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
 
   const send = useCallback(() => {
     const text = input.trim();
@@ -277,7 +417,6 @@ export default function NormalUserPage() {
     setInput('');
     setTyping(true);
 
-    // Small delay to simulate the assistant thinking
     setTimeout(() => {
       setEvents((prev) => {
         const { events: newEvts, response } = parseMessage(text, prev);
@@ -287,7 +426,7 @@ export default function NormalUserPage() {
           const sessionId = getOrCreateSessionId();
           saveCalendarEvents(sessionId, newEvts).catch(console.error);
         }
-        return [...prev, ...newEvts];
+        return detectConflicts([...prev, ...newEvts]);
       });
     }, 500);
   }, [input, typing]);
@@ -303,21 +442,25 @@ export default function NormalUserPage() {
     setEvents([]);
     setMessages((prev) => [
       ...prev,
-      { role: 'assistant', text: 'Done — I cleared your timetable. Start fresh!' },
+      { role: 'assistant', text: 'Done — timetable cleared. Start fresh!' },
     ]);
     const sessionId = getOrCreateSessionId();
     deleteCalendarEventsBySession(sessionId).catch(console.error);
   };
 
+  const internalCount = events.filter((e) => e.source !== 'google').length;
+  const googleCount = events.filter((e) => e.source === 'google').length;
+  const conflictCount = events.filter((e) => e.hasConflict).length;
   const totalHeight = (GRID_END - GRID_START) * HOUR_PX;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-midnight">
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-white/5 bg-midnight/90 backdrop-blur-sm">
         <Logo />
         <div className="flex items-center gap-4">
-          {/* Legend */}
           <div className="hidden lg:flex items-center gap-3">
             {LEGEND.map(({ label, cat }) => (
               <div key={cat} className="flex items-center gap-1.5">
@@ -325,24 +468,32 @@ export default function NormalUserPage() {
                 <span className="text-xs text-slate-500">{label}</span>
               </div>
             ))}
+            {googleCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full border border-dashed border-slate-500 bg-slate-700/50" />
+                <span className="text-xs text-slate-500">Google</span>
+              </div>
+            )}
           </div>
-          <span className="text-xs text-slate-600 border-l border-white/5 pl-4">
-            {events.length} event{events.length !== 1 ? 's' : ''}
-          </span>
-          <Link
-            href="/"
-            className="text-xs text-slate-500 hover:text-white transition-colors"
-          >
+
+          <div className="flex items-center gap-2 text-xs border-l border-white/5 pl-4">
+            <span className="text-slate-600">{events.length} event{events.length !== 1 ? 's' : ''}</span>
+            {conflictCount > 0 && (
+              <span className="text-orange-400 font-medium">⚠ {conflictCount} conflict{conflictCount !== 1 ? 's' : ''}</span>
+            )}
+          </div>
+
+          <Link href="/" className="text-xs text-slate-500 hover:text-white transition-colors">
             ← Home
           </Link>
         </div>
       </header>
 
-      {/* ── Body ── */}
+      {/* Body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ══════════════ TIMETABLE ══════════════ */}
+        {/* ══ TIMETABLE ══ */}
         <div className="flex-1 flex flex-col overflow-hidden border-r border-white/5 min-w-0">
-          {/* Day header row */}
+          {/* Day header */}
           <div className="shrink-0 flex border-b border-white/5 bg-slate-950/60">
             <div className="w-12 shrink-0" />
             {DAYS.map((day, i) => {
@@ -350,9 +501,7 @@ export default function NormalUserPage() {
               return (
                 <div key={day} className="flex-1 py-2.5 text-center">
                   <p className="text-xs font-medium text-slate-400">{DAY_SHORT[i]}</p>
-                  {count > 0 && (
-                    <p className="text-[10px] text-sky mt-0.5">{count}</p>
-                  )}
+                  {count > 0 && <p className="text-[10px] text-sky mt-0.5">{count}</p>}
                 </div>
               );
             })}
@@ -377,7 +526,6 @@ export default function NormalUserPage() {
               {/* Day columns */}
               {DAYS.map((day) => (
                 <div key={day} className="flex-1 relative border-l border-white/5 min-w-0">
-                  {/* Hour grid lines */}
                   {HOURS.map((h) => (
                     <div
                       key={h}
@@ -385,7 +533,6 @@ export default function NormalUserPage() {
                       style={{ top: (h - GRID_START) * HOUR_PX }}
                     />
                   ))}
-                  {/* Events */}
                   {events
                     .filter((e) => e.day === day)
                     .map((ev) => (
@@ -397,7 +544,7 @@ export default function NormalUserPage() {
           </div>
         </div>
 
-        {/* ══════════════ CHAT PANEL ══════════════ */}
+        {/* ══ CHAT PANEL ══ */}
         <div className="w-72 xl:w-80 shrink-0 flex flex-col bg-slate-950/40">
           {/* Chat header */}
           <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
@@ -405,23 +552,88 @@ export default function NormalUserPage() {
               <h2 className="text-sm font-semibold text-white">Schedule Assistant</h2>
               <p className="text-[11px] text-slate-500 mt-0.5">Describe your schedule in plain English</p>
             </div>
-            {events.length > 0 && (
-              <button
-                onClick={clearAll}
-                className="text-[11px] text-slate-600 hover:text-red-400 transition-colors"
-              >
+            {internalCount > 0 && (
+              <button onClick={clearAll} className="text-[11px] text-slate-600 hover:text-red-400 transition-colors">
                 Clear all
               </button>
+            )}
+          </div>
+
+          {/* Google Calendar sync section */}
+          <div className="shrink-0 px-3 py-3 border-b border-white/5 bg-slate-950/30">
+            {!googleToken ? (
+              <button
+                onClick={() => googleLogin()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 bg-slate-900/60 text-slate-300 text-xs hover:border-sky/30 hover:text-sky transition-all"
+              >
+                {/* Google "G" icon */}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Connect Google Calendar
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-[11px] text-emerald-400 font-medium">Google Connected</span>
+                  </div>
+                  <button
+                    onClick={disconnect}
+                    className="text-[10px] text-slate-600 hover:text-red-400 transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={importFromGoogle}
+                    disabled={syncing}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-slate-300 text-[11px] hover:border-sky/30 hover:text-sky disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {syncing ? (
+                      <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      </svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                    )}
+                    Import this week
+                  </button>
+                  <button
+                    onClick={exportToGoogle}
+                    disabled={syncing || internalCount === 0}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-slate-300 text-[11px] hover:border-emerald-500/30 hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    Export to Google
+                  </button>
+                </div>
+                {googleCount > 0 && (
+                  <p className="text-[10px] text-slate-600 text-center">
+                    {googleCount} Google event{googleCount !== 1 ? 's' : ''} shown (dashed border)
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
             {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[88%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
                     msg.role === 'user'
@@ -449,7 +661,6 @@ export default function NormalUserPage() {
                 </div>
               </div>
             )}
-
             <div ref={chatEndRef} />
           </div>
 
@@ -489,27 +700,27 @@ export default function NormalUserPage() {
                 disabled={!input.trim() || typing}
                 className="w-8 h-8 rounded-xl bg-sky flex items-center justify-center hover:bg-sky/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 mb-0.5"
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 2L11 13" />
                   <path d="M22 2L15 22L11 13L2 9L22 2Z" />
                 </svg>
               </button>
             </div>
-            <p className="text-[10px] text-slate-700 mt-1.5 px-0.5">
-              Enter to send · Shift+Enter for new line
-            </p>
+            <p className="text-[10px] text-slate-700 mt-1.5 px-0.5">Enter to send · Shift+Enter for new line</p>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Wrapper — provides GoogleOAuthProvider ───────────────────────────────────
+
+export default function NormalUserPageWrapper() {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+  return (
+    <GoogleOAuthProvider clientId={clientId}>
+      <NormalUserPage />
+    </GoogleOAuthProvider>
   );
 }
