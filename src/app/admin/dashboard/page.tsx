@@ -7,8 +7,10 @@ import Logo from '@/components/Logo';
 import {
   getAllScheduleRequests,
   getAllUniversities,
+  getAllProfessorFeedback,
   ScheduleRequestDoc,
   UniversityDoc,
+  ProfessorFeedbackDoc,
 } from '@/lib/db';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -170,6 +172,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [requests, setRequests] = useState<ScheduleRequestDoc[]>([]);
   const [universities, setUniversities] = useState<UniversityDoc[]>([]);
+  const [feedback, setFeedback] = useState<ProfessorFeedbackDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedUnivId, setSelectedUnivId] = useState('all');
@@ -184,9 +187,14 @@ export default function AdminDashboard() {
     setLoading(true);
     setError('');
     try {
-      const [reqs, univs] = await Promise.all([getAllScheduleRequests(), getAllUniversities()]);
+      const [reqs, univs, fbs] = await Promise.all([
+        getAllScheduleRequests(),
+        getAllUniversities(),
+        getAllProfessorFeedback(),
+      ]);
       setRequests(reqs);
       setUniversities(univs);
+      setFeedback(fbs);
     } catch (err) {
       console.error(err);
       setError('Failed to load data. Check your connection and try again.');
@@ -200,6 +208,11 @@ export default function AdminDashboard() {
   const filtered = useMemo(
     () => selectedUnivId === 'all' ? requests : requests.filter((r) => r.universityId === selectedUnivId),
     [requests, selectedUnivId]
+  );
+
+  const filteredFeedback = useMemo(
+    () => selectedUnivId === 'all' ? feedback : feedback.filter((f) => f.universityId === selectedUnivId),
+    [feedback, selectedUnivId]
   );
 
   const stats = useMemo(() => computeStats(filtered), [filtered]);
@@ -280,6 +293,13 @@ export default function AdminDashboard() {
               <TimePreferencesPanel timeSlots={stats.timeSlots} totalRequests={stats.totalRequests} />
               <DayPreferencesPanel days={stats.dayStats} />
             </div>
+
+            {/* Professor feedback panel — full width */}
+            {filteredFeedback.length > 0 && (
+              <div className="lg:col-span-3">
+                <ProfessorFeedbackPanel feedback={filteredFeedback} />
+              </div>
+            )}
           </div>
         )}
 
@@ -527,6 +547,121 @@ function DayPreferencesPanel({ days }: { days: DayStat[] }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+interface ProfSummary {
+  name: string;
+  courses: string[];
+  reviewCount: number;
+  avgRating: number | null;
+  avgDifficulty: number | null;
+  avgClarity: number | null;
+  wouldTakeAgainPct: number | null;
+}
+
+function ProfessorFeedbackPanel({ feedback }: { feedback: ProfessorFeedbackDoc[] }) {
+  const profMap = new Map<string, ProfessorFeedbackDoc[]>();
+  for (const f of feedback) {
+    const key = f.professorName.trim().toLowerCase();
+    if (!profMap.has(key)) profMap.set(key, []);
+    profMap.get(key)!.push(f);
+  }
+
+  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  const summaries: ProfSummary[] = Array.from(profMap.entries()).map(([, fbs]) => {
+    const wtaVotes = fbs.filter((f) => f.wouldTakeAgain != null);
+    const courses = [...new Set(fbs.map((f) => f.courseName?.toUpperCase().trim()).filter(Boolean))] as string[];
+    return {
+      name: fbs[0].professorName.trim(),
+      courses,
+      reviewCount: fbs.length,
+      avgRating: avg(fbs.filter((f) => f.rating != null).map((f) => f.rating!)),
+      avgDifficulty: avg(fbs.filter((f) => f.difficulty != null).map((f) => f.difficulty!)),
+      avgClarity: avg(fbs.filter((f) => f.teachingClarity != null).map((f) => f.teachingClarity!)),
+      wouldTakeAgainPct: wtaVotes.length > 0
+        ? (wtaVotes.filter((f) => f.wouldTakeAgain).length / wtaVotes.length) * 100
+        : null,
+    };
+  }).sort((a, b) => b.reviewCount - a.reviewCount);
+
+  return (
+    <div className="rounded-2xl border border-white/8 bg-slate-900/40 overflow-hidden">
+      <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+        <div>
+          <h2 className="text-white font-semibold">Professor Feedback Analytics</h2>
+          <p className="text-slate-500 text-xs mt-0.5">
+            Aggregated student ratings · {feedback.length} {feedback.length === 1 ? 'review' : 'reviews'} · {summaries.length} {summaries.length === 1 ? 'professor' : 'professors'}
+          </p>
+        </div>
+        <Link
+          href="/professors"
+          className="text-sky text-xs hover:text-sky/80 transition-colors"
+        >
+          View professor page →
+        </Link>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/5 bg-white/[0.02]">
+              <th className="px-6 py-3 text-left text-slate-500 font-medium text-xs uppercase tracking-wider">Professor</th>
+              <th className="px-4 py-3 text-left text-slate-500 font-medium text-xs uppercase tracking-wider">Courses</th>
+              <th className="px-4 py-3 text-center text-slate-500 font-medium text-xs uppercase tracking-wider">Reviews</th>
+              <th className="px-4 py-3 text-center text-slate-500 font-medium text-xs uppercase tracking-wider">Overall</th>
+              <th className="px-4 py-3 text-center text-slate-500 font-medium text-xs uppercase tracking-wider">Clarity</th>
+              <th className="px-4 py-3 text-center text-slate-500 font-medium text-xs uppercase tracking-wider">Difficulty</th>
+              <th className="px-4 py-3 text-center text-slate-500 font-medium text-xs uppercase tracking-wider">Take Again</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/[0.04]">
+            {summaries.map((p) => (
+              <tr key={p.name} className="hover:bg-white/[0.02] transition-colors">
+                <td className="px-6 py-3.5">
+                  <span className="text-white font-medium text-sm">{p.name}</span>
+                </td>
+                <td className="px-4 py-3.5">
+                  <div className="flex flex-wrap gap-1">
+                    {p.courses.slice(0, 3).map((c) => (
+                      <span key={c} className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-xs font-mono">{c}</span>
+                    ))}
+                    {p.courses.length > 3 && (
+                      <span className="text-slate-600 text-xs">+{p.courses.length - 3}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3.5 text-center">
+                  <span className="text-slate-300 text-sm">{p.reviewCount}</span>
+                </td>
+                <td className="px-4 py-3.5 text-center">
+                  {p.avgRating != null ? (
+                    <span className="text-white font-semibold">{p.avgRating.toFixed(1)}<span className="text-slate-600 font-normal text-xs">/5</span></span>
+                  ) : <span className="text-slate-600 text-xs">—</span>}
+                </td>
+                <td className="px-4 py-3.5 text-center">
+                  {p.avgClarity != null ? (
+                    <span className="text-sky text-sm">{p.avgClarity.toFixed(1)}</span>
+                  ) : <span className="text-slate-600 text-xs">—</span>}
+                </td>
+                <td className="px-4 py-3.5 text-center">
+                  {p.avgDifficulty != null ? (
+                    <span className="text-amber-400 text-sm">{p.avgDifficulty.toFixed(1)}</span>
+                  ) : <span className="text-slate-600 text-xs">—</span>}
+                </td>
+                <td className="px-4 py-3.5 text-center">
+                  {p.wouldTakeAgainPct != null ? (
+                    <span className={p.wouldTakeAgainPct >= 60 ? 'text-emerald-400 text-sm' : 'text-red-400 text-sm'}>
+                      {Math.round(p.wouldTakeAgainPct)}%
+                    </span>
+                  ) : <span className="text-slate-600 text-xs">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

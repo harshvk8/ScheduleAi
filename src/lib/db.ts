@@ -215,6 +215,11 @@ export async function saveProfessorFeedback(feedback: {
   courseName: string;
   universityId: string;
   rating?: number;
+  difficulty?: number;
+  teachingClarity?: number;
+  workload?: number;
+  attendanceStrictness?: number;
+  wouldTakeAgain?: boolean;
   comment?: string;
   studentEmail?: string;
 }): Promise<string> {
@@ -223,6 +228,11 @@ export async function saveProfessorFeedback(feedback: {
     courseName: feedback.courseName,
     universityId: feedback.universityId,
     rating: feedback.rating ?? null,
+    difficulty: feedback.difficulty ?? null,
+    teachingClarity: feedback.teachingClarity ?? null,
+    workload: feedback.workload ?? null,
+    attendanceStrictness: feedback.attendanceStrictness ?? null,
+    wouldTakeAgain: feedback.wouldTakeAgain ?? null,
     comment: feedback.comment ?? null,
     studentEmail: feedback.studentEmail ?? null,
     submittedAt: serverTimestamp(),
@@ -288,6 +298,11 @@ export interface ProfessorFeedbackDoc {
   courseName: string;
   universityId: string;
   rating: number | null;
+  difficulty: number | null;
+  teachingClarity: number | null;
+  workload: number | null;
+  attendanceStrictness: number | null;
+  wouldTakeAgain: boolean | null;
   comment: string | null;
   studentEmail: string | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

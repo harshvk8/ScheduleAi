@@ -9,6 +9,7 @@ import {
   ScheduleRequestDoc,
   ProfessorFeedbackDoc,
 } from '@/lib/db';
+import { useRouter } from 'next/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,10 @@ interface ProfessorProfile {
   courses: string[];
   requestCount: number;
   avgRating: number | null;
+  avgDifficulty: number | null;
+  avgClarity: number | null;
+  avgWorkload: number | null;
+  wouldTakeAgainPct: number | null;
   feedbackCount: number;
   recentComments: string[];
 }
@@ -46,6 +51,10 @@ function buildProfiles(
           courses: [],
           requestCount: 0,
           avgRating: null,
+          avgDifficulty: null,
+          avgClarity: null,
+          avgWorkload: null,
+          wouldTakeAgainPct: null,
           feedbackCount: 0,
           recentComments: [],
         });
@@ -76,6 +85,10 @@ function buildProfiles(
         courses: [],
         requestCount: 0,
         avgRating: null,
+        avgDifficulty: null,
+        avgClarity: null,
+        avgWorkload: null,
+        wouldTakeAgainPct: null,
         feedbackCount: 0,
         recentComments: [],
       });
@@ -87,9 +100,16 @@ function buildProfiles(
     const fbs = fbByProf.get(key) ?? [];
     p.feedbackCount = fbs.length;
 
-    const ratings = fbs.filter((f) => f.rating != null).map((f) => f.rating!);
-    p.avgRating = ratings.length > 0
-      ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+    p.avgRating = avg(fbs.filter((f) => f.rating != null).map((f) => f.rating!));
+    p.avgDifficulty = avg(fbs.filter((f) => f.difficulty != null).map((f) => f.difficulty!));
+    p.avgClarity = avg(fbs.filter((f) => f.teachingClarity != null).map((f) => f.teachingClarity!));
+    p.avgWorkload = avg(fbs.filter((f) => f.workload != null).map((f) => f.workload!));
+
+    const wtaVotes = fbs.filter((f) => f.wouldTakeAgain != null);
+    p.wouldTakeAgainPct = wtaVotes.length > 0
+      ? (wtaVotes.filter((f) => f.wouldTakeAgain).length / wtaVotes.length) * 100
       : null;
 
     p.recentComments = fbs
@@ -255,15 +275,22 @@ export default function ProfessorsPage() {
               </div>
             )}
 
-            {/* Phase 8 teaser */}
-            {filtered.length > 0 && (
-              <div className="mt-12 text-center px-4 py-5 rounded-2xl border border-white/5 bg-slate-900/30 max-w-lg mx-auto">
-                <p className="text-slate-400 text-sm font-medium mb-1">Want to rate a professor?</p>
-                <p className="text-slate-600 text-xs">
-                  Professor ratings &amp; feedback system coming in Phase 8.
-                </p>
-              </div>
-            )}
+            {/* Rate a professor CTA */}
+            <div className="mt-12 text-center px-6 py-6 rounded-2xl border border-white/8 bg-slate-900/30 max-w-lg mx-auto">
+              <p className="text-white text-sm font-semibold mb-1">Taken a class recently?</p>
+              <p className="text-slate-400 text-xs mb-4">
+                Share your experience and help other students choose the right professor.
+              </p>
+              <Link
+                href="/feedback"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky/10 border border-sky/20 text-sky text-sm hover:bg-sky/20 transition-colors font-medium"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+                Rate a professor
+              </Link>
+            </div>
           </>
         )}
       </main>
@@ -326,26 +353,51 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
       {/* Rating section */}
       {p.feedbackCount > 0 && p.avgRating != null ? (
         <div className="mb-4">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-3">
             <span className="text-3xl font-bold text-white">{p.avgRating.toFixed(1)}</span>
             <div>
               <StarRow rating={p.avgRating} />
               <p className="text-slate-500 text-xs mt-1">
-                Based on {p.feedbackCount} {p.feedbackCount === 1 ? 'review' : 'reviews'}
+                {p.feedbackCount} {p.feedbackCount === 1 ? 'review' : 'reviews'}
               </p>
             </div>
           </div>
+          {/* Breakdown bars */}
+          <div className="space-y-1.5">
+            {p.avgDifficulty != null && (
+              <MiniBar label="Difficulty" value={p.avgDifficulty} max={5} />
+            )}
+            {p.avgClarity != null && (
+              <MiniBar label="Clarity" value={p.avgClarity} max={5} green />
+            )}
+            {p.avgWorkload != null && (
+              <MiniBar label="Workload" value={p.avgWorkload} max={5} />
+            )}
+          </div>
+          {p.wouldTakeAgainPct != null && (
+            <p className="text-xs mt-2.5">
+              <span className={p.wouldTakeAgainPct >= 60 ? 'text-emerald-400' : 'text-red-400'}>
+                {Math.round(p.wouldTakeAgainPct)}%
+              </span>
+              <span className="text-slate-500"> would take again</span>
+            </p>
+          )}
         </div>
       ) : (
-        <div className="mb-4 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+        <div className="mb-4 flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/5">
           <p className="text-slate-600 text-xs">No ratings yet</p>
-          <p className="text-slate-700 text-xs mt-0.5">Feedback system coming in Phase 8</p>
+          <Link
+            href={`/feedback?professor=${encodeURIComponent(p.name)}`}
+            className="text-sky text-xs hover:text-sky/80 transition-colors"
+          >
+            Be first to rate
+          </Link>
         </div>
       )}
 
       {/* Comments */}
       {p.recentComments.length > 0 && (
-        <div className="space-y-2 mt-auto">
+        <div className="space-y-2 mb-4">
           {p.recentComments.slice(0, 2).map((comment, i) => (
             <blockquote
               key={i}
@@ -356,6 +408,19 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
           ))}
         </div>
       )}
+
+      {/* Rate link */}
+      <div className="mt-auto pt-3 border-t border-white/5">
+        <Link
+          href={`/feedback?professor=${encodeURIComponent(p.name)}`}
+          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-white/8 text-slate-400 text-xs hover:border-sky/30 hover:text-sky transition-colors"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          Rate this professor
+        </Link>
+      </div>
     </div>
   );
 }
@@ -377,6 +442,24 @@ function StarRow({ rating }: { rating: number }) {
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       ))}
+    </div>
+  );
+}
+
+// ─── Mini stat bar ────────────────────────────────────────────────────────────
+
+function MiniBar({ label, value, max, green }: { label: string; value: number; max: number; green?: boolean }) {
+  const pct = Math.round((value / max) * 100);
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-slate-600 text-xs w-16 shrink-0">{label}</span>
+      <div className="flex-1 h-1 rounded-full bg-white/5">
+        <div
+          className={`h-full rounded-full ${green ? 'bg-sky/50' : 'bg-slate-600'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-slate-500 text-xs w-6 text-right">{value.toFixed(1)}</span>
     </div>
   );
 }

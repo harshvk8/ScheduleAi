@@ -6,7 +6,16 @@
       "Bash(Select-Object Name, FullName)",
       "Bash(node -e ' *)",
       "Bash(npm run *)",
-      "Bash(firebase deploy *)"
+      "Bash(firebase deploy *)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\" -Force | Format-Table Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Out-String)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\feedback\" -Force)",
+      "Bash(Out-Null)",
+      "Bash(Write-Host \"done\")",
+      "Bash(mkdir -p \"/mnt/c/Users/broos/Desktop/Scheduleai/ScheduleAi/src/app/feedback\" && echo \"done\")",
+      "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\feedback\" -Force)"
+    ],
+    "additionalDirectories": [
+      "\\mnt\\c\\Users\\broos\\Desktop\\Scheduleai\\ScheduleAi\\src\\app"
     ]
   }
 }
