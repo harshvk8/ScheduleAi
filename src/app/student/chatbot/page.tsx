@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { saveScheduleRequest } from '@/lib/db';
+import { saveScheduleRequest, getAllProfessorFeedback, getAllScheduleRequests } from '@/lib/db';
+import type { ChatApiResponse } from '@/app/api/chat/route';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,8 +32,8 @@ interface CoursePreference {
 interface ScheduleConstraint {
   type: 'work' | 'unavailable';
   description: string;
-  days?: string[];
-  timeLabel?: TimeLabel;
+  avoidTimes?: TimeLabel[];
+  avoidDays?: string[];
 }
 
 interface StudentPreferences {
@@ -50,173 +51,158 @@ interface ChatMessage {
   text: string;
 }
 
-// ─── NLP Helpers ──────────────────────────────────────────────────────────────
+interface ProfRec {
+  course: string;
+  professor: string;
+  reason: string;
+}
+
+interface SlotSuggestion {
+  day: string;
+  time: TimeLabel;
+  score: number;
+}
+
+interface AvailableProfessor {
+  name: string;
+  courses: string[];
+  avgRating: number | null;
+  wouldTakeAgainPct: number | null;
+}
+
+// ─── Regex fallback NLP ────────────────────────────────────────────────────────
 
 const COURSE_RE = /\b([A-Z]{2,6}\s*\d{3,4}[A-Z]?)\b/g;
 
 const TIME_KEYWORDS: Record<string, TimeLabel> = {
-  morning: 'Morning',
-  mornings: 'Morning',
-  'early morning': 'Morning',
-  'early classes': 'Morning',
-  afternoon: 'Afternoon',
-  afternoons: 'Afternoon',
-  midday: 'Afternoon',
-  'mid-day': 'Afternoon',
-  evening: 'Evening',
-  evenings: 'Evening',
-  'evening class': 'Evening',
-  night: 'Night',
-  nights: 'Night',
-  late: 'Night',
-  'late night': 'Night',
+  morning: 'Morning', mornings: 'Morning', 'early morning': 'Morning',
+  afternoon: 'Afternoon', afternoons: 'Afternoon', midday: 'Afternoon',
+  evening: 'Evening', evenings: 'Evening',
+  night: 'Night', nights: 'Night', late: 'Night',
 };
 
 const DAY_KEYWORDS: Record<string, string[]> = {
-  monday: ['Monday'],
-  mon: ['Monday'],
-  tuesday: ['Tuesday'],
-  tue: ['Tuesday'],
-  tues: ['Tuesday'],
-  wednesday: ['Wednesday'],
-  wed: ['Wednesday'],
-  thursday: ['Thursday'],
-  thu: ['Thursday'],
-  thurs: ['Thursday'],
-  friday: ['Friday'],
-  fri: ['Friday'],
-  saturday: ['Saturday'],
-  sat: ['Saturday'],
-  sunday: ['Sunday'],
-  sun: ['Sunday'],
+  monday: ['Monday'], mon: ['Monday'],
+  tuesday: ['Tuesday'], tue: ['Tuesday'], tues: ['Tuesday'],
+  wednesday: ['Wednesday'], wed: ['Wednesday'],
+  thursday: ['Thursday'], thu: ['Thursday'], thurs: ['Thursday'],
+  friday: ['Friday'], fri: ['Friday'],
+  saturday: ['Saturday'], sat: ['Saturday'],
+  sunday: ['Sunday'], sun: ['Sunday'],
   mwf: ['Monday', 'Wednesday', 'Friday'],
-  tth: ['Tuesday', 'Thursday'],
-  tuth: ['Tuesday', 'Thursday'],
-  'tuesday thursday': ['Tuesday', 'Thursday'],
-  'monday wednesday friday': ['Monday', 'Wednesday', 'Friday'],
+  tth: ['Tuesday', 'Thursday'], tuth: ['Tuesday', 'Thursday'],
   weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
   weekends: ['Saturday', 'Sunday'],
 };
 
 const MODALITY_KEYWORDS: Record<string, Modality> = {
-  online: 'online',
-  remote: 'online',
-  virtual: 'online',
-  'in-person': 'in-person',
-  'in person': 'in-person',
-  'face-to-face': 'in-person',
-  'on campus': 'in-person',
-  'on-campus': 'in-person',
-  campus: 'in-person',
-  hybrid: 'hybrid',
-  blended: 'hybrid',
+  online: 'online', remote: 'online', virtual: 'online',
+  'in-person': 'in-person', 'in person': 'in-person', campus: 'in-person',
+  hybrid: 'hybrid', blended: 'hybrid',
 };
 
-const AVOID_RE =
-  /\b(cannot|can't|cant|avoid|don't want|wont|won't|unable|never|no\s+(?:class|morning|afternoon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i;
+const AVOID_RE = /\b(cannot|can't|cant|avoid|don't want|wont|won't|unable|never)\b/i;
 const NEGATE_RE = /\b(not|no|never|cannot|can't|cant|avoid|don't|won't)\b/i;
 const WORK_RE = /\b(work|job|shift|employed|working)\b/i;
 
-interface Extracted {
-  courses: string[];
-  professors: string[];
-  preferTimes: TimeLabel[];
-  avoidTimes: TimeLabel[];
-  preferDays: string[];
-  avoidDays: string[];
-  modality?: Modality;
-  isWork: boolean;
-  workDesc?: string;
+function isNegatedAt(text: string, idx: number) {
+  return NEGATE_RE.test(text.slice(Math.max(0, idx - 35), idx));
 }
 
-function extractCourses(text: string): string[] {
+function regexExtract(text: string) {
   const upper = text.toUpperCase();
-  return [...new Set(Array.from(upper.matchAll(COURSE_RE)).map((m) => m[1].replace(/\s+/, ' ')))];
-}
+  const courses = [...new Set(Array.from(upper.matchAll(COURSE_RE)).map((m) => m[1].replace(/\s+/, ' ')))];
 
-function extractProfessors(text: string): string[] {
-  const re =
-    /(?:professor|prof\.?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)|with\s+(?:professor|prof\.?)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
-  const names: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const name = (m[1] || m[2] || '').trim();
-    if (name) names.push('Professor ' + name);
+  const profRe = /(?:professor|prof\.?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)|with\s+(?:professor|prof\.?)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
+  const professors: string[] = [];
+  let pm: RegExpExecArray | null;
+  while ((pm = profRe.exec(text)) !== null) {
+    const n = (pm[1] || pm[2] || '').trim();
+    if (n) professors.push('Professor ' + n);
   }
-  return [...new Set(names)];
-}
 
-function isNegatedAt(text: string, idx: number): boolean {
-  const window = text.slice(Math.max(0, idx - 35), idx);
-  return NEGATE_RE.test(window);
-}
-
-function extractTimes(text: string): { prefer: TimeLabel[]; avoid: TimeLabel[] } {
-  const prefer: TimeLabel[] = [];
-  const avoid: TimeLabel[] = [];
   const lower = text.toLowerCase();
-  const sortedKeys = Object.keys(TIME_KEYWORDS).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
+  const preferTimes: TimeLabel[] = [];
+  const avoidTimes: TimeLabel[] = [];
+  for (const key of Object.keys(TIME_KEYWORDS).sort((a, b) => b.length - a.length)) {
     const idx = lower.indexOf(key);
     if (idx === -1) continue;
     const label = TIME_KEYWORDS[key];
     if (isNegatedAt(lower, idx) || AVOID_RE.test(lower.slice(Math.max(0, idx - 30), idx + key.length))) {
-      if (!avoid.includes(label)) avoid.push(label);
+      if (!avoidTimes.includes(label)) avoidTimes.push(label);
     } else {
-      if (!prefer.includes(label)) prefer.push(label);
+      if (!preferTimes.includes(label)) preferTimes.push(label);
     }
   }
-  // Remove from prefer if also in avoid
-  return { prefer: prefer.filter((t) => !avoid.includes(t)), avoid };
-}
 
-function extractDays(text: string): { prefer: string[]; avoid: string[] } {
-  const prefer: string[] = [];
-  const avoid: string[] = [];
-  const lower = text.toLowerCase();
-  const sortedKeys = Object.keys(DAY_KEYWORDS).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
+  const preferDays: string[] = [];
+  const avoidDays: string[] = [];
+  for (const key of Object.keys(DAY_KEYWORDS).sort((a, b) => b.length - a.length)) {
     const idx = lower.indexOf(key);
     if (idx === -1) continue;
     const days = DAY_KEYWORDS[key];
     if (isNegatedAt(lower, idx)) {
-      days.forEach((d) => { if (!avoid.includes(d)) avoid.push(d); });
+      days.forEach((d) => { if (!avoidDays.includes(d)) avoidDays.push(d); });
     } else {
-      days.forEach((d) => { if (!prefer.includes(d)) prefer.push(d); });
+      days.forEach((d) => { if (!preferDays.includes(d)) preferDays.push(d); });
     }
   }
-  return {
-    prefer: [...new Set(prefer.filter((d) => !avoid.includes(d)))],
-    avoid: [...new Set(avoid)],
-  };
-}
 
-function extractModality(text: string): Modality | undefined {
-  const lower = text.toLowerCase();
-  const sortedKeys = Object.keys(MODALITY_KEYWORDS).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
-    if (lower.includes(key)) return MODALITY_KEYWORDS[key];
+  let modality: Modality | undefined;
+  for (const key of Object.keys(MODALITY_KEYWORDS).sort((a, b) => b.length - a.length)) {
+    if (lower.includes(key)) { modality = MODALITY_KEYWORDS[key]; break; }
   }
-  return undefined;
-}
 
-function extractAll(text: string): Extracted {
-  const courses = extractCourses(text);
-  const professors = extractProfessors(text);
-  const times = extractTimes(text);
-  const days = extractDays(text);
-  const modality = extractModality(text);
   const isWork = WORK_RE.test(text);
   let workDesc: string | undefined;
   if (isWork) {
-    const m = text.match(/(?:i\s+)?work\s+.{5,60}?(?:\.|,|$)/i);
-    workDesc = m ? m[0].trim() : 'Has work commitments';
+    const wm = text.match(/(?:i\s+)?work\s+.{5,60}?(?:\.|,|$)/i);
+    workDesc = wm ? wm[0].trim() : 'Has work commitments';
   }
-  return { courses, professors, preferTimes: times.prefer, avoidTimes: times.avoid, preferDays: days.prefer, avoidDays: days.avoid, modality, isWork, workDesc };
+
+  // When work is mentioned, any times found (without negation) are work hours, not class preferences.
+  // Move them to workAvoidTimes so the grid shows amber instead of green.
+  const cleanPreferTimes = isWork ? [] : preferTimes.filter((t) => !avoidTimes.includes(t));
+  const workAvoidTimes: TimeLabel[] = isWork ? preferTimes.filter((t) => !avoidTimes.includes(t)) : [];
+  const workAvoidDays: string[] = isWork ? [...new Set(preferDays.filter((d) => !avoidDays.includes(d)))] : [];
+  const cleanPreferDays = isWork ? [] : [...new Set(preferDays.filter((d) => !avoidDays.includes(d)))];
+
+  return {
+    courses, professors,
+    preferTimes: cleanPreferTimes,
+    avoidTimes,
+    preferDays: cleanPreferDays,
+    avoidDays: [...new Set(avoidDays)],
+    modality, isWork, workDesc,
+    workAvoidTimes,
+    workAvoidDays,
+  };
 }
 
-function applyExtracted(prefs: StudentPreferences, data: Extracted): StudentPreferences {
+// ─── Apply extracted to prefs ─────────────────────────────────────────────────
+
+function applyExtracted(
+  prefs: StudentPreferences,
+  data: {
+    courses: string[];
+    professors: string[];
+    preferTimes: string[];
+    avoidTimes: string[];
+    preferDays: string[];
+    avoidDays: string[];
+    modality?: string | null;
+    isWork: boolean;
+    workDesc?: string | null;
+    workAvoidTimes?: string[];
+    workAvoidDays?: string[];
+  }
+): StudentPreferences {
   const p: StudentPreferences = JSON.parse(JSON.stringify(prefs));
+
+  const preferTimes = (data.preferTimes ?? []) as TimeLabel[];
+  const avoidTimes = (data.avoidTimes ?? []) as TimeLabel[];
+  const workAvoidTimes = (data.workAvoidTimes ?? []) as TimeLabel[];
+  const workAvoidDays = (data.workAvoidDays ?? []) as string[];
 
   if (data.courses.length > 0) {
     for (const courseName of data.courses) {
@@ -226,99 +212,93 @@ function applyExtracted(prefs: StudentPreferences, data: Extracted): StudentPref
         p.courses.push(c);
       }
       if (data.professors[0]) c.preferredProfessor = data.professors[0];
-      if (data.preferTimes.length) c.preferredTimes = [...new Set([...c.preferredTimes, ...data.preferTimes])];
-      if (data.avoidTimes.length) c.avoidTimes = [...new Set([...c.avoidTimes, ...data.avoidTimes])];
+      if (preferTimes.length) c.preferredTimes = [...new Set([...c.preferredTimes, ...preferTimes])];
+      if (avoidTimes.length) c.avoidTimes = [...new Set([...c.avoidTimes, ...avoidTimes])];
       if (data.preferDays.length) c.preferredDays = [...new Set([...c.preferredDays, ...data.preferDays])];
       if (data.avoidDays.length) c.avoidDays = [...new Set([...c.avoidDays, ...data.avoidDays])];
-      if (data.modality) c.modality = data.modality;
+      if (data.modality) c.modality = data.modality as Modality;
     }
   } else {
-    // Apply to global prefs
-    data.preferTimes.forEach((t) => { if (!p.generalPreferTimes.includes(t)) p.generalPreferTimes.push(t); });
-    data.avoidTimes.forEach((t) => { if (!p.generalAvoidTimes.includes(t)) p.generalAvoidTimes.push(t); });
+    preferTimes.forEach((t) => { if (!p.generalPreferTimes.includes(t)) p.generalPreferTimes.push(t); });
+    // avoidTimes here are NON-work avoids → go to generalAvoidTimes (red)
+    avoidTimes.forEach((t) => { if (!p.generalAvoidTimes.includes(t)) p.generalAvoidTimes.push(t); });
     data.preferDays.forEach((d) => { if (!p.generalPreferDays.includes(d)) p.generalPreferDays.push(d); });
     data.avoidDays.forEach((d) => { if (!p.generalAvoidDays.includes(d)) p.generalAvoidDays.push(d); });
-    if (data.modality) p.defaultModality = data.modality;
+    if (data.modality) p.defaultModality = data.modality as Modality;
   }
 
   if (data.isWork) {
-    const alreadyHasWork = p.constraints.some((c) => c.type === 'work');
-    if (!alreadyHasWork) {
-      p.constraints.push({ type: 'work', description: data.workDesc ?? 'Work commitments' });
+    // workAvoidTimes go ONLY into the work constraint — never into generalAvoidTimes.
+    // This keeps them amber in the grid instead of red.
+    const existing = p.constraints.find((c) => c.type === 'work');
+    if (existing) {
+      if (workAvoidTimes.length)
+        existing.avoidTimes = [...new Set([...(existing.avoidTimes ?? []), ...workAvoidTimes])];
+      if (workAvoidDays.length)
+        existing.avoidDays = [...new Set([...(existing.avoidDays ?? []), ...workAvoidDays])];
+      if (data.workDesc) existing.description = data.workDesc;
+    } else {
+      p.constraints.push({
+        type: 'work',
+        description: data.workDesc ?? 'Work commitments',
+        ...(workAvoidTimes.length ? { avoidTimes: workAvoidTimes } : {}),
+        ...(workAvoidDays.length ? { avoidDays: workAvoidDays } : {}),
+      });
     }
   }
 
   return p;
 }
 
-// ─── Guided Questions ─────────────────────────────────────────────────────────
+// ─── Schedule suggestion engine ───────────────────────────────────────────────
 
-const STEPS = [
-  (name: string) =>
-    `Hi ${name}! I'm your scheduling assistant.\n\nWhat courses are you planning to take this semester? You can list them like: *CSIT 313, MATH 201, CS 101*`,
-  () =>
-    `Do you have any preferred professors? For example: *"Professor Brown for CSIT 313"* — or just say "no preference" if you're flexible.`,
-  () =>
-    `Which days work best for you? Or are there days you'd like to avoid?\n\nYou can say things like *"MWF"*, *"no Fridays"*, or *"Tuesday and Thursday only"*.`,
-  () =>
-    `What time of day do you prefer? Morning, afternoon, or evening — and are there any times you absolutely cannot make?`,
-  () =>
-    `Do you have a work schedule or other commitments that might conflict with classes? (e.g., *"I work Monday through Friday 9 to 5"*)`,
-  () =>
-    `Do you prefer **online**, **in-person**, or **hybrid** classes? Or does it depend on the course?`,
-  () =>
-    `Anything else I should know about your schedule? Type *"done"* when you're finished and I'll show you a summary.`,
-];
+const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const ALL_TIMES: TimeLabel[] = ['Morning', 'Afternoon', 'Evening', 'Night'];
 
-function buildBotReply(data: Extracted, currentStep: number): string {
-  const parts: string[] = [];
+function computeSuggestions(prefs: StudentPreferences): SlotSuggestion[] {
+  const workConstraints = prefs.constraints.filter((c) => c.type === 'work');
+  const slots: SlotSuggestion[] = [];
 
-  if (data.courses.length > 0)
-    parts.push(`Noted — **${data.courses.join(', ')}**${data.professors.length ? ` with ${data.professors[0]}` : ''}.`);
-  if (data.avoidTimes.length)
-    parts.push(`I'll block out **${data.avoidTimes.join(' and ')}** hours.`);
-  else if (data.preferTimes.length)
-    parts.push(`Prioritizing **${data.preferTimes.join(' and ')}** slots.`);
-  if (data.avoidDays.length)
-    parts.push(`No classes on **${data.avoidDays.join(', ')}** — got it.`);
-  else if (data.preferDays.length)
-    parts.push(`Preferring **${data.preferDays.join(', ')}**.`);
-  if (data.modality)
-    parts.push(`You prefer **${data.modality}** format.`);
-  if (data.isWork)
-    parts.push(`Work schedule noted — I'll keep those times clear.`);
-  if (parts.length === 0)
-    parts.push(`Got it, thanks!`);
-
-  const nextStep = Math.min(currentStep + 1, STEPS.length - 1);
-  const nextQ = STEPS[nextStep]('');
-  if (nextQ && currentStep < STEPS.length - 1) {
-    parts.push(`\n\n${nextQ}`);
+  for (const day of ALL_DAYS) {
+    for (const time of ALL_TIMES) {
+      let score = 0;
+      if (prefs.generalAvoidDays.includes(day) || prefs.generalAvoidTimes.includes(time)) continue;
+      // Only penalise times we actually know conflict with work
+      for (const wc of workConstraints) {
+        const timeBlocked = wc.avoidTimes?.includes(time) ?? false;
+        const dayBlocked = wc.avoidDays?.length ? wc.avoidDays.includes(day) : true; // if no days specified, assume all weekdays
+        if (timeBlocked && dayBlocked) { score -= 3; }
+      }
+      if (prefs.generalPreferTimes.includes(time)) score += 3;
+      if (prefs.generalPreferDays.includes(day)) score += 2;
+      if (['Tuesday', 'Thursday'].includes(day)) score += 1;
+      if (score < 0) continue;
+      slots.push({ day, time, score });
+    }
   }
 
-  return parts.join(' ');
+  return slots.sort((a, b) => b.score - a.score).slice(0, 4);
 }
 
-// ─── Visual Helpers ───────────────────────────────────────────────────────────
+// ─── Visual helpers ────────────────────────────────────────────────────────────
 
 const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const ALL_TIMES: TimeLabel[] = ['Morning', 'Afternoon', 'Evening', 'Night'];
 
 type CellStatus = 'neutral' | 'preferred' | 'avoided' | 'work';
 
 function getCellStatus(day: string, time: TimeLabel, prefs: StudentPreferences): CellStatus {
   if (prefs.generalAvoidTimes.includes(time) || prefs.generalAvoidDays.includes(day)) return 'avoided';
-  const hasWork = prefs.constraints.some((c) => c.type === 'work');
-  if (hasWork && (time === 'Morning' || time === 'Afternoon') && !['Saturday', 'Sunday'].includes(day))
-    return 'work';
-  const timeMatch =
-    prefs.generalPreferTimes.length === 0 || prefs.generalPreferTimes.includes(time);
-  const dayMatch =
-    prefs.generalPreferDays.length === 0 || prefs.generalPreferDays.includes(day);
-  if (prefs.generalPreferTimes.length > 0 || prefs.generalPreferDays.length > 0) {
-    if (timeMatch && dayMatch) return 'preferred';
+  // Mark as 'work' only for times/days the student actually told us they work
+  for (const wc of prefs.constraints) {
+    if (wc.type !== 'work' || !wc.avoidTimes?.length) continue;
+    const timeBlocked = wc.avoidTimes.includes(time);
+    const dayBlocked = wc.avoidDays?.length ? wc.avoidDays.includes(day) : !['Saturday', 'Sunday'].includes(day);
+    if (timeBlocked && dayBlocked) return 'work';
   }
+  const timeMatch = prefs.generalPreferTimes.length === 0 || prefs.generalPreferTimes.includes(time);
+  const dayMatch = prefs.generalPreferDays.length === 0 || prefs.generalPreferDays.includes(day);
+  if ((prefs.generalPreferTimes.length > 0 || prefs.generalPreferDays.length > 0) && timeMatch && dayMatch) return 'preferred';
   return 'neutral';
 }
 
@@ -350,9 +330,7 @@ function renderMarkdown(text: string) {
       <span key={i}>
         {parts.map((part, j) =>
           j % 2 === 1 ? (
-            <strong key={j} className="font-semibold text-white">
-              {part}
-            </strong>
+            <strong key={j} className="font-semibold text-white">{part}</strong>
           ) : (
             <span key={j}>{part.replace(/\*(.*?)\*/g, '$1')}</span>
           )
@@ -363,29 +341,49 @@ function renderMarkdown(text: string) {
   });
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Initial steps (fallback prompts) ─────────────────────────────────────────
+
+const STEPS = [
+  (name: string) =>
+    `Hi ${name}! I'm your scheduling assistant.\n\nWhat courses are you planning to take this semester? You can list them like: *CSIT 313, MATH 201, CS 101*`,
+  () => `Do you have any preferred professors? Say *"Professor Brown for CSIT 313"* or *"no preference"*.`,
+  () => `Which days work best for you — or any you'd like to avoid? Try *"MWF"*, *"no Fridays"*, or *"Tuesday and Thursday only"*.`,
+  () => `What time of day works best — morning, afternoon, or evening? Any times you absolutely can't make?`,
+  () => `Do you have a work schedule or other commitments? (e.g. *"I work Mon–Fri 9 to 1"*)`,
+  () => `Do you prefer **online**, **in-person**, or **hybrid** classes?`,
+  () => `Anything else I should know? Type *"done"* when you're finished.`,
+];
+
+// ─── Empty prefs ───────────────────────────────────────────────────────────────
 
 const EMPTY_PREFS: StudentPreferences = {
-  courses: [],
-  constraints: [],
-  generalPreferTimes: [],
-  generalAvoidTimes: [],
-  generalPreferDays: [],
-  generalAvoidDays: [],
+  courses: [], constraints: [],
+  generalPreferTimes: [], generalAvoidTimes: [],
+  generalPreferDays: [], generalAvoidDays: [],
 };
+
+// ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function StudentChatbotPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // API message history (only user/assistant turns, no bot preamble)
+  const [apiHistory, setApiHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [prefs, setPrefs] = useState<StudentPreferences>(EMPTY_PREFS);
   const [input, setInput] = useState('');
   const [step, setStep] = useState(0);
   const [typing, setTyping] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [conflicts, setConflicts] = useState<string[]>([]);
+  const [profRecs, setProfRecs] = useState<ProfRec[]>([]);
+  const [suggestions, setSuggestions] = useState<SlotSuggestion[]>([]);
+  const [availableProfs, setAvailableProfs] = useState<AvailableProfessor[]>([]);
+  const [aiEnabled, setAiEnabled] = useState(true); // flips false if API returns 503
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Load student profile + pre-fetch professor data
   useEffect(() => {
     const raw = sessionStorage.getItem('studentProfile');
     if (!raw) { router.replace('/student'); return; }
@@ -399,17 +397,94 @@ export default function StudentChatbotPage() {
     } catch {
       router.replace('/student');
     }
+
+    // Pre-fetch professor feedback so we can recommend
+    Promise.all([getAllScheduleRequests(), getAllProfessorFeedback()])
+      .then(([reqs, feedback]) => {
+        const map = new Map<string, AvailableProfessor>();
+        for (const req of reqs) {
+          for (const c of req.courses ?? []) {
+            const name = c.preferredProfessor?.trim();
+            if (!name) continue;
+            const key = name.toLowerCase();
+            if (!map.has(key)) map.set(key, { name, courses: [], avgRating: null, wouldTakeAgainPct: null });
+            const cn = c.course?.toUpperCase();
+            if (cn && !map.get(key)!.courses.includes(cn)) map.get(key)!.courses.push(cn);
+          }
+        }
+        const fbByProf = new Map<string, typeof feedback>();
+        for (const fb of feedback) {
+          const key = fb.professorName.trim().toLowerCase();
+          if (!fbByProf.has(key)) fbByProf.set(key, []);
+          fbByProf.get(key)!.push(fb);
+        }
+        for (const [key, p] of map) {
+          const fbs = fbByProf.get(key) ?? [];
+          const ratings = fbs.filter((f) => f.rating != null).map((f) => f.rating!);
+          p.avgRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+          const wtaVotes = fbs.filter((f) => f.wouldTakeAgain != null);
+          p.wouldTakeAgainPct = wtaVotes.length
+            ? (wtaVotes.filter((f) => f.wouldTakeAgain).length / wtaVotes.length) * 100
+            : null;
+          for (const fb of fbs) {
+            const cn = fb.courseName?.toUpperCase().trim();
+            if (cn && !p.courses.includes(cn)) p.courses.push(cn);
+          }
+        }
+        setAvailableProfs(Array.from(map.values()).filter((p) => p.avgRating != null));
+      })
+      .catch(() => {/* non-critical */});
   }, [router]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
 
+  // Recompute schedule suggestions whenever prefs change
+  useEffect(() => {
+    const newSuggestions = computeSuggestions(prefs);
+    setSuggestions(newSuggestions);
+  }, [prefs]);
+
+  const callAI = useCallback(
+    async (
+      userText: string,
+      currentPrefs: StudentPreferences,
+      history: Array<{ role: 'user' | 'assistant'; content: string }>
+    ): Promise<ChatApiResponse | null> => {
+      try {
+        const resp = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [...history, { role: 'user', content: userText }],
+            currentPrefs: {
+              courses: currentPrefs.courses,
+              constraints: currentPrefs.constraints,
+              generalPreferTimes: currentPrefs.generalPreferTimes,
+              generalAvoidTimes: currentPrefs.generalAvoidTimes,
+              generalPreferDays: currentPrefs.generalPreferDays,
+              generalAvoidDays: currentPrefs.generalAvoidDays,
+              defaultModality: currentPrefs.defaultModality,
+            },
+            studentName: profile?.name ?? '',
+            availableProfessors: availableProfs.slice(0, 20),
+          }),
+        });
+        if (resp.status === 503) { setAiEnabled(false); return null; }
+        if (!resp.ok) return null;
+        return await resp.json();
+      } catch {
+        return null;
+      }
+    },
+    [profile, availableProfs]
+  );
+
   function send() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || isDone) return;
     setInput('');
-
     setMessages((prev) => [...prev, { role: 'user', text }]);
 
     if (/^done$/i.test(text) || /^finish(ed)?$/i.test(text)) {
@@ -418,26 +493,20 @@ export default function StudentChatbotPage() {
         setTyping(false);
         setMessages((prev) => [
           ...prev,
-          { role: 'bot', text: `Perfect! Here's everything I've captured — take a look at your preferences on the right. Your profile is ready to match against available sections.` },
+          { role: 'bot', text: `Perfect! Your preferences are saved on the right. Hit **Submit** to send them to your university.` },
         ]);
         setIsDone(true);
-        // Persist to Firestore (fire-and-forget)
         if (profile) {
-          const stored = sessionStorage.getItem('studentProfile');
-          const sp = stored ? JSON.parse(stored) : {};
-          const universityId = sp.universityId ?? profile.universityId ?? '';
+          const sp = sessionStorage.getItem('studentProfile');
+          const stored = sp ? JSON.parse(sp) : {};
           saveScheduleRequest(
-            profile.email,
-            profile.name,
-            universityId,
+            profile.email, profile.name,
+            stored.universityId ?? profile.universityId ?? '',
             profile.universityName,
             {
-              courses: prefs.courses,
-              constraints: prefs.constraints,
-              generalPreferTimes: prefs.generalPreferTimes,
-              generalAvoidTimes: prefs.generalAvoidTimes,
-              generalPreferDays: prefs.generalPreferDays,
-              generalAvoidDays: prefs.generalAvoidDays,
+              courses: prefs.courses, constraints: prefs.constraints,
+              generalPreferTimes: prefs.generalPreferTimes, generalAvoidTimes: prefs.generalAvoidTimes,
+              generalPreferDays: prefs.generalPreferDays, generalAvoidDays: prefs.generalAvoidDays,
               defaultModality: prefs.defaultModality,
             }
           ).catch(console.error);
@@ -446,18 +515,74 @@ export default function StudentChatbotPage() {
       return;
     }
 
-    const data = extractAll(text);
-    const updated = applyExtracted(prefs, data);
-    setPrefs(updated);
     setTyping(true);
 
-    setTimeout(() => {
-      setTyping(false);
-      const reply = buildBotReply(data, step);
-      setMessages((prev) => [...prev, { role: 'bot', text: reply }]);
-      setStep((s) => Math.min(s + 1, STEPS.length - 1));
-      inputRef.current?.focus();
-    }, 750);
+    if (aiEnabled) {
+      callAI(text, prefs, apiHistory).then((result) => {
+        setTyping(false);
+        if (!result) {
+          // AI unavailable — fall back to regex
+          const data = regexExtract(text);
+          const updated = applyExtracted(prefs, data);
+          setPrefs(updated);
+          const nextQ = STEPS[Math.min(step + 1, STEPS.length - 1)]('');
+          setMessages((prev) => [...prev, { role: 'bot', text: `Got it! ${nextQ}` }]);
+          setStep((s) => Math.min(s + 1, STEPS.length - 1));
+          return;
+        }
+        // Use regex to find courses actually written in THIS message — Claude can echo
+        // courses from conversation history, which would wrongly route general preferences
+        // (days, times) into course-specific slots instead of generalPreferDays/Times.
+        const coursesInMessage = regexExtract(text).courses;
+        // Apply AI-extracted data
+        const updated = applyExtracted(prefs, {
+          courses: coursesInMessage,
+          professors: result.professors,
+          preferTimes: result.preferTimes,
+          avoidTimes: result.avoidTimes,
+          preferDays: result.preferDays,
+          avoidDays: result.avoidDays,
+          modality: result.modality,
+          isWork: result.isWork,
+          workDesc: result.workDesc,
+          workAvoidTimes: result.workAvoidTimes ?? [],
+          workAvoidDays: result.workAvoidDays ?? [],
+        });
+        setPrefs(updated);
+        if (result.conflicts.length) setConflicts((prev) => [...new Set([...prev, ...result.conflicts])]);
+        if (result.profRecommendations.length) {
+          setProfRecs((prev) => {
+            const merged = [...prev];
+            for (const rec of result.profRecommendations) {
+              if (!merged.find((r) => r.course === rec.course && r.professor === rec.professor)) {
+                merged.push(rec);
+              }
+            }
+            return merged;
+          });
+        }
+        setMessages((prev) => [...prev, { role: 'bot', text: result.reply }]);
+        setApiHistory((h) => [
+          ...h,
+          { role: 'user', content: text },
+          { role: 'assistant', content: result.reply },
+        ]);
+        setStep((s) => Math.min(s + 1, STEPS.length - 1));
+        inputRef.current?.focus();
+      });
+    } else {
+      // Pure regex fallback
+      setTimeout(() => {
+        setTyping(false);
+        const data = regexExtract(text);
+        const updated = applyExtracted(prefs, data);
+        setPrefs(updated);
+        const nextQ = STEPS[Math.min(step + 1, STEPS.length - 1)]('');
+        setMessages((prev) => [...prev, { role: 'bot', text: nextQ }]);
+        setStep((s) => Math.min(s + 1, STEPS.length - 1));
+        inputRef.current?.focus();
+      }, 600);
+    }
   }
 
   function handleKey(e: React.KeyboardEvent) {
@@ -471,7 +596,7 @@ export default function StudentChatbotPage() {
     prefs.generalPreferDays.length > 0 ||
     prefs.generalAvoidDays.length > 0 ||
     prefs.constraints.length > 0 ||
-    prefs.defaultModality;
+    !!prefs.defaultModality;
 
   if (!profile) return null;
 
@@ -481,7 +606,14 @@ export default function StudentChatbotPage() {
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
       {/* ── Header ── */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
-        <Logo />
+        <div className="flex items-center gap-3">
+          <Logo />
+          {!aiEnabled && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25">
+              Regex mode
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-slate-900/60">
             <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/25 flex items-center justify-center text-sky-400 font-bold text-xs">
@@ -504,32 +636,22 @@ export default function StudentChatbotPage() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ══════════════════════════════════════════
-            LEFT PANEL — Chat
-        ══════════════════════════════════════════ */}
+        {/* ════════════════════════ LEFT — Chat ════════════════════════ */}
         <div className="w-[42%] flex flex-col border-r border-white/5">
-          {/* Progress bar */}
+          {/* Progress */}
           <div className="px-5 pt-4 pb-3 border-b border-white/5 shrink-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-slate-500">
-                {isDone ? 'Complete' : `Question ${Math.min(step + 1, STEPS.length)} of ${STEPS.length}`}
+                {isDone ? 'Complete' : `Step ${Math.min(step + 1, STEPS.length)} of ${STEPS.length}`}
               </span>
               <span className="text-xs text-slate-500">{progressPercent}%</span>
             </div>
             <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-sky-500 rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
+              <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
             </div>
             <div className="flex gap-1 mt-2.5">
               {STEPS.map((_, i) => (
-                <div
-                  key={i}
-                  className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${
-                    i <= step ? 'bg-sky-500' : 'bg-gray-700'
-                  }`}
-                />
+                <div key={i} className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-sky-500' : 'bg-gray-700'}`} />
               ))}
             </div>
           </div>
@@ -545,13 +667,7 @@ export default function StudentChatbotPage() {
                     </svg>
                   </div>
                 )}
-                <div
-                  className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-sky-600 text-white rounded-br-sm'
-                      : 'bg-gray-800 text-gray-200 rounded-bl-sm'
-                  }`}
-                >
+                <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-200 rounded-bl-sm'}`}>
                   {renderMarkdown(msg.text)}
                 </div>
               </div>
@@ -566,11 +682,7 @@ export default function StudentChatbotPage() {
                 </div>
                 <div className="bg-gray-800 px-3.5 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
                   {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce"
-                      style={{ animationDelay: `${i * 150}ms` }}
-                    />
+                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                   ))}
                 </div>
               </div>
@@ -581,10 +693,7 @@ export default function StudentChatbotPage() {
           {/* Input */}
           <div className="px-4 py-3 border-t border-white/5 shrink-0">
             {isDone ? (
-              <button
-                onClick={() => router.push('/')}
-                className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors"
-              >
+              <button onClick={() => router.push('/')} className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors">
                 Return to Home
               </button>
             ) : (
@@ -609,16 +718,14 @@ export default function StudentChatbotPage() {
               </div>
             )}
             <p className="text-[10px] text-gray-600 text-center mt-1.5">
-              Try: &ldquo;CSIT 313 with Prof Brown, no morning classes, I work weekdays&rdquo;
+              Try: &ldquo;CSIT 313 with Prof Brown, no morning classes, I work Mon–Fri 9 to 1&rdquo;
             </p>
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════
-            RIGHT PANEL — Live Preferences
-        ══════════════════════════════════════════ */}
+        {/* ════════════════════════ RIGHT — Preferences ════════════════════════ */}
         <div className="flex-1 overflow-y-auto bg-gray-900/40">
-          {!hasAnyPrefs ? (
+          {!hasAnyPrefs && conflicts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-10">
               <div className="w-14 h-14 rounded-2xl bg-gray-800 border border-white/8 flex items-center justify-center mb-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -626,24 +733,46 @@ export default function StudentChatbotPage() {
                 </svg>
               </div>
               <p className="text-gray-500 text-sm font-medium mb-1">Your preferences will appear here</p>
-              <p className="text-gray-600 text-xs max-w-xs">
-                As you answer questions on the left, I&apos;ll build your scheduling profile in real time.
-              </p>
+              <p className="text-gray-600 text-xs max-w-xs">As you chat on the left, I&apos;ll build your scheduling profile in real time.</p>
             </div>
           ) : (
             <div className="p-5 space-y-5">
-              {/* ─ Course Cards ─ */}
+
+              {/* ─ Conflict Warnings ─ */}
+              {conflicts.length > 0 && (
+                <section>
+                  <h2 className="text-[11px] font-semibold text-red-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" />
+                    </svg>
+                    Conflicts Detected
+                  </h2>
+                  <div className="space-y-2">
+                    {conflicts.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-950/50 border border-red-800/40">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+                        <span className="text-xs text-red-300 leading-relaxed">{c}</span>
+                        <button
+                          onClick={() => setConflicts((prev) => prev.filter((_, j) => j !== i))}
+                          className="ml-auto text-red-700 hover:text-red-400 transition-colors shrink-0"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" x2="6" y1="6" y2="18" /><line x1="6" x2="18" y1="6" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* ─ Courses ─ */}
               {prefs.courses.length > 0 && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">
-                    Courses
-                  </h2>
+                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Courses</h2>
                   <div className="space-y-2.5">
                     {prefs.courses.map((c) => (
-                      <div
-                        key={c.course}
-                        className="bg-gray-800/70 border border-white/5 rounded-2xl px-4 py-3.5"
-                      >
+                      <div key={c.course} className="bg-gray-800/70 border border-white/5 rounded-2xl px-4 py-3.5">
                         <div className="flex items-start justify-between gap-3 mb-2.5">
                           <div>
                             <span className="text-sm font-bold text-white tracking-wide">{c.course}</span>
@@ -657,28 +786,48 @@ export default function StudentChatbotPage() {
                             </span>
                           )}
                         </div>
-
                         <div className="flex flex-wrap gap-1.5">
                           {c.preferredTimes.map((t) => (
-                            <span key={t} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIME_BADGE[t]}`}>
-                              ✓ {t}
-                            </span>
+                            <span key={t} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIME_BADGE[t as TimeLabel]}`}>✓ {t}</span>
                           ))}
                           {c.avoidTimes.map((t) => (
-                            <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">
-                              ✕ {t}
-                            </span>
+                            <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">✕ {t}</span>
                           ))}
                           {c.preferredDays.map((d) => (
-                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 ring-1 ring-emerald-800/40">
-                              {d.slice(0, 3)}
-                            </span>
+                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 ring-1 ring-emerald-800/40">{d.slice(0, 3)}</span>
                           ))}
                           {c.avoidDays.map((d) => (
-                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">
-                              no {d.slice(0, 3)}
-                            </span>
+                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">no {d.slice(0, 3)}</span>
                           ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* ─ Professor Recommendations ─ */}
+              {profRecs.length > 0 && (
+                <section>
+                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    Professor Suggestions
+                  </h2>
+                  <div className="space-y-2">
+                    {profRecs.map((rec, i) => (
+                      <div key={i} className="flex items-start gap-3 px-3.5 py-3 rounded-xl bg-sky-950/40 border border-sky-800/30">
+                        <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0 text-sky-400 text-[10px] font-bold">
+                          {rec.professor.split(' ').pop()?.charAt(0) ?? 'P'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-sky-300">{rec.professor}</span>
+                            <span className="text-[10px] text-slate-600">for</span>
+                            <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{rec.course}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{rec.reason}</p>
                         </div>
                       </div>
                     ))}
@@ -694,23 +843,17 @@ export default function StudentChatbotPage() {
                 prefs.defaultModality ||
                 prefs.constraints.length > 0) && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">
-                    General Preferences
-                  </h2>
+                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">General Preferences</h2>
                   <div className="bg-gray-800/70 border border-white/5 rounded-2xl px-4 py-3.5 space-y-3">
                     {(prefs.generalPreferTimes.length > 0 || prefs.generalAvoidTimes.length > 0) && (
                       <div>
                         <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Time of Day</p>
                         <div className="flex flex-wrap gap-1.5">
                           {prefs.generalPreferTimes.map((t) => (
-                            <span key={t} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIME_BADGE[t]}`}>
-                              ✓ {t}
-                            </span>
+                            <span key={t} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIME_BADGE[t as TimeLabel]}`}>✓ {t}</span>
                           ))}
                           {prefs.generalAvoidTimes.map((t) => (
-                            <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">
-                              ✕ {t}
-                            </span>
+                            <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">✕ {t}</span>
                           ))}
                         </div>
                       </div>
@@ -720,14 +863,10 @@ export default function StudentChatbotPage() {
                         <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Days</p>
                         <div className="flex flex-wrap gap-1.5">
                           {prefs.generalPreferDays.map((d) => (
-                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 ring-1 ring-emerald-800/40">
-                              ✓ {d.slice(0, 3)}
-                            </span>
+                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 ring-1 ring-emerald-800/40">✓ {d.slice(0, 3)}</span>
                           ))}
                           {prefs.generalAvoidDays.map((d) => (
-                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">
-                              ✕ {d.slice(0, 3)}
-                            </span>
+                            <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 ring-1 ring-red-800/40">✕ {d.slice(0, 3)}</span>
                           ))}
                         </div>
                       </div>
@@ -757,12 +896,35 @@ export default function StudentChatbotPage() {
                 </section>
               )}
 
+              {/* ─ Schedule Suggestions ─ */}
+              {suggestions.length > 0 && (
+                <section>
+                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    Best Time Slots for You
+                  </h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    {suggestions.map((s, i) => (
+                      <div key={i} className="flex flex-col px-3 py-2.5 rounded-xl bg-violet-950/30 border border-violet-800/25">
+                        <span className="text-xs font-semibold text-violet-300">{s.day.slice(0, 3)}</span>
+                        <span className={`text-[10px] font-medium mt-0.5 ${TIME_BADGE[s.time].split(' ').filter(c => c.startsWith('text-')).join(' ')}`}>{s.time}</span>
+                        <div className="flex gap-0.5 mt-1.5">
+                          {[...Array(Math.min(s.score, 5))].map((_, j) => (
+                            <div key={j} className="w-1 h-1 rounded-full bg-violet-400/60" />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {/* ─ Availability Grid ─ */}
               {hasAnyPrefs && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">
-                    Availability Overview
-                  </h2>
+                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Availability Overview</h2>
                   <div className="bg-gray-800/70 border border-white/5 rounded-2xl p-4 overflow-x-auto">
                     <table className="w-full text-center" style={{ minWidth: 340 }}>
                       <thead>
@@ -773,7 +935,7 @@ export default function StudentChatbotPage() {
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="space-y-1">
+                      <tbody>
                         {ALL_TIMES.map((time) => (
                           <tr key={time}>
                             <td className="text-[10px] text-gray-500 py-1 pr-2 text-left font-medium">{time}</td>
@@ -789,7 +951,6 @@ export default function StudentChatbotPage() {
                         ))}
                       </tbody>
                     </table>
-                    {/* Legend */}
                     <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-white/5">
                       {[
                         { label: 'Available', cls: 'bg-gray-700' },
@@ -807,7 +968,7 @@ export default function StudentChatbotPage() {
                 </section>
               )}
 
-              {/* ─ JSON Preview (for devs) ─ */}
+              {/* ─ Structured JSON output ─ */}
               {prefs.courses.length > 0 && (
                 <section>
                   <details className="group">
@@ -816,25 +977,32 @@ export default function StudentChatbotPage() {
                     </summary>
                     <pre className="mt-2 bg-gray-900 border border-white/5 rounded-xl p-3 text-[10px] text-gray-400 overflow-x-auto leading-relaxed">
                       {JSON.stringify(
-                        prefs.courses.map((c) => ({
-                          course: c.course,
-                          ...(c.preferredProfessor ? { preferredProfessor: c.preferredProfessor } : {}),
-                          ...(c.preferredDays.length ? { preferredDays: c.preferredDays } : {}),
-                          ...(c.avoidDays.length ? { avoidDays: c.avoidDays } : {}),
-                          ...(c.preferredTimes.length ? { preferredTimes: c.preferredTimes } : {}),
-                          ...(c.avoidTimes.length ? { avoidTimes: c.avoidTimes } : {}),
-                          ...(c.modality ? { modality: c.modality } : {}),
-                          ...(prefs.constraints.length
-                            ? { constraints: prefs.constraints.map((x) => x.type) }
-                            : {}),
-                        })),
-                        null,
-                        2
+                        {
+                          studentName: profile.name,
+                          university: profile.universityName,
+                          courses: prefs.courses.map((c) => ({
+                            course: c.course,
+                            ...(c.preferredProfessor ? { preferredProfessor: c.preferredProfessor } : {}),
+                            ...(c.preferredDays.length ? { preferredDays: c.preferredDays } : {}),
+                            ...(c.avoidDays.length ? { avoidDays: c.avoidDays } : {}),
+                            ...(c.preferredTimes.length ? { preferredTimes: c.preferredTimes } : {}),
+                            ...(c.avoidTimes.length ? { avoidTimes: c.avoidTimes } : {}),
+                            ...(c.modality ? { modality: c.modality } : {}),
+                          })),
+                          ...(prefs.generalPreferTimes.length ? { globalPreferTimes: prefs.generalPreferTimes } : {}),
+                          ...(prefs.generalAvoidTimes.length ? { globalAvoidTimes: prefs.generalAvoidTimes } : {}),
+                          ...(prefs.generalPreferDays.length ? { globalPreferDays: prefs.generalPreferDays } : {}),
+                          ...(prefs.generalAvoidDays.length ? { globalAvoidDays: prefs.generalAvoidDays } : {}),
+                          ...(prefs.defaultModality ? { defaultModality: prefs.defaultModality } : {}),
+                          ...(prefs.constraints.length ? { constraints: prefs.constraints } : {}),
+                        },
+                        null, 2
                       )}
                     </pre>
                   </details>
                 </section>
               )}
+
             </div>
           )}
         </div>

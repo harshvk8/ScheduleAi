@@ -12,7 +12,10 @@
       "Bash(Out-Null)",
       "Bash(Write-Host \"done\")",
       "Bash(mkdir -p \"/mnt/c/Users/broos/Desktop/Scheduleai/ScheduleAi/src/app/feedback\" && echo \"done\")",
-      "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\feedback\" -Force)"
+      "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\feedback\" -Force)",
+      "Bash(npm install *)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\api\\\\chat\" -Force)",
+      "Bash(Write-Output \"done\")"
     ],
     "additionalDirectories": [
       "\\mnt\\c\\Users\\broos\\Desktop\\Scheduleai\\ScheduleAi\\src\\app"
