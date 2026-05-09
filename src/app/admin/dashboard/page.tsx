@@ -4,6 +4,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
 import {
   getAllScheduleRequests,
   getAllUniversities,
@@ -170,6 +173,7 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { user, profile, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<ScheduleRequestDoc[]>([]);
   const [universities, setUniversities] = useState<UniversityDoc[]>([]);
   const [feedback, setFeedback] = useState<ProfessorFeedbackDoc[]>([]);
@@ -178,10 +182,10 @@ export default function AdminDashboard() {
   const [selectedUnivId, setSelectedUnivId] = useState('all');
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !sessionStorage.getItem('sa_admin')) {
+    if (!authLoading && (!user || profile?.role !== 'admin')) {
       router.replace('/admin');
     }
-  }, [router]);
+  }, [user, profile, authLoading, router]);
 
   async function load() {
     setLoading(true);
@@ -217,12 +221,13 @@ export default function AdminDashboard() {
 
   const stats = useMemo(() => computeStats(filtered), [filtered]);
 
-  function logout() {
-    sessionStorage.removeItem('sa_admin');
+  async function logout() {
+    await signOut(auth);
     router.push('/admin');
   }
 
-  if (loading) return <LoadingScreen />;
+  if (authLoading || loading) return <LoadingScreen />;
+  if (!user || profile?.role !== 'admin') return null;
 
   return (
     <div className="min-h-screen bg-midnight text-white">

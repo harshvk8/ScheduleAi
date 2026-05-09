@@ -4,7 +4,13 @@ import { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { getUniversity } from '@/data/universities';
-import { saveUser } from '@/lib/db';
+import { saveUserProfile, getUserProfile } from '@/lib/db';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  AuthError,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -19,33 +25,19 @@ function StepBar({ current }: { current: number }) {
         return (
           <div key={label} className="flex items-center">
             <div className="flex flex-col items-center gap-1">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
-                  done
-                    ? 'bg-sky text-white'
-                    : active
-                    ? 'bg-sky/20 border border-sky/50 text-sky'
-                    : 'bg-slate-800 border border-white/10 text-slate-500'
-                }`}
-              >
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
+                done ? 'bg-sky text-white' : active ? 'bg-sky/20 border border-sky/50 text-sky' : 'bg-slate-800 border border-white/10 text-slate-500'
+              }`}>
                 {done ? (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
-                ) : (
-                  i + 1
-                )}
+                ) : i + 1}
               </div>
-              <span className={`text-[10px] ${active ? 'text-sky' : done ? 'text-slate-400' : 'text-slate-600'}`}>
-                {label}
-              </span>
+              <span className={`text-[10px] ${active ? 'text-sky' : done ? 'text-slate-400' : 'text-slate-600'}`}>{label}</span>
             </div>
             {i < STEPS.length - 1 && (
-              <div
-                className={`h-px w-12 sm:w-20 mx-1 mb-4 transition-colors ${
-                  i < current ? 'bg-sky/50' : 'bg-white/8'
-                }`}
-              />
+              <div className={`h-px w-12 sm:w-20 mx-1 mb-4 transition-colors ${i < current ? 'bg-sky/50' : 'bg-white/8'}`} />
             )}
           </div>
         );
@@ -54,18 +46,10 @@ function StepBar({ current }: { current: number }) {
   );
 }
 
-// ─── Field component ──────────────────────────────────────────────────────────
+// ─── Field ────────────────────────────────────────────────────────────────────
 
-function Field({
-  label,
-  hint,
-  error,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
+function Field({ label, hint, error, children }: {
+  label: string; hint?: string; error?: string; children: React.ReactNode;
 }) {
   return (
     <div>
@@ -87,12 +71,30 @@ function Field({
 
 const inputCls = (hasError: boolean) =>
   `w-full px-3.5 py-3 rounded-xl border text-sm text-white placeholder:text-slate-600 bg-slate-900/60 focus:outline-none focus:ring-1 transition-all ${
-    hasError
-      ? 'border-red-500/50 focus:border-red-500/70 focus:ring-red-500/20'
-      : 'border-white/10 focus:border-sky/50 focus:ring-sky/20'
+    hasError ? 'border-red-500/50 focus:border-red-500/70 focus:ring-red-500/20' : 'border-white/10 focus:border-sky/50 focus:ring-sky/20'
   }`;
 
-// ─── Form (needs useSearchParams → must be inside Suspense) ──────────────────
+function friendlyAuthError(err: AuthError): string {
+  switch (err.code) {
+    case 'auth/email-already-in-use':
+      return 'Account already exists. Switch to "Returning student" to sign in.';
+    case 'auth/weak-password':
+      return 'Password must be at least 6 characters.';
+    case 'auth/invalid-email':
+      return 'Enter a valid email address.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+      return 'Wrong password. Please try again.';
+    case 'auth/user-not-found':
+      return 'No account found. Register as a new student.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait and try again.';
+    default:
+      return 'Something went wrong. Please try again.';
+  }
+}
+
+// ─── Form ─────────────────────────────────────────────────────────────────────
 
 function StudentInfoForm() {
   const params = useSearchParams();
@@ -101,79 +103,101 @@ function StudentInfoForm() {
   const universityId = params.get('university') ?? '';
   const university = getUniversity(universityId);
 
+  const [mode, setMode] = useState<'new' | 'returning'>('new');
+
+  // New student
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [studentId, setStudentId] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Returning student
+  const [retEmail, setRetEmail] = useState('');
+  const [retPassword, setRetPassword] = useState('');
+
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [authError, setAuthError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Redirect back if no valid university in URL
   if (!university) {
     router.replace('/student');
     return null;
   }
 
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!name.trim() || name.trim().length < 2)
-      e.name = 'Enter your full name (at least 2 characters)';
+  const clearError = (field: string) =>
+    setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
 
-    if (!email.trim()) {
-      e.email = 'Enter your university email';
-    } else if (!email.toLowerCase().endsWith(`@${university.domain}`)) {
-      e.email = `Must end with @${university.domain}`;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      e.email = 'Enter a valid email address';
-    }
-
-    if (!studentId.trim())
-      e.studentId = 'Enter your student ID';
-    else if (!/^[A-Za-z0-9-_]+$/.test(studentId.trim()))
-      e.studentId = 'ID can only contain letters, numbers, and hyphens';
-
-    return e;
-  };
-
-  const handleSubmit = async (ev: React.FormEvent) => {
+  // ── New student ───────────────────────────────────────────────────────────
+  const handleNewSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    setAuthError('');
+    const e: Record<string, string> = {};
 
-    const profile = {
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      studentId: studentId.trim().toUpperCase(),
-      universityId,
-      universityName: university.name,
-      domain: university.domain,
-    };
+    if (!name.trim() || name.trim().length < 2) e.name = 'Enter your full name (at least 2 characters)';
+    if (!email.trim()) e.email = 'Enter your university email';
+    else if (!email.toLowerCase().endsWith(`@${university.domain}`)) e.email = `Must end with @${university.domain}`;
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email address';
+    if (!studentId.trim()) e.studentId = 'Enter your student ID';
+    else if (!/^[A-Za-z0-9-_]+$/.test(studentId.trim())) e.studentId = 'ID can only contain letters, numbers, and hyphens';
+    if (!password) e.password = 'Choose a password';
+    else if (password.length < 6) e.password = 'Password must be at least 6 characters';
+    if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match';
 
-    sessionStorage.setItem('studentProfile', JSON.stringify(profile));
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
 
     setSaving(true);
-    saveUser(profile).catch(console.error);
-
-    router.push('/student/chatbot');
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      const profileData = {
+        email: email.trim().toLowerCase(),
+        name: name.trim(),
+        role: 'student' as const,
+        universityId,
+        universityName: university.name,
+        studentId: studentId.trim().toUpperCase(),
+        domain: university.domain,
+      };
+      await saveUserProfile(cred.user.uid, profileData);
+      sessionStorage.setItem('studentProfile', JSON.stringify({ ...profileData, uid: cred.user.uid }));
+      router.push('/student/chatbot');
+    } catch (err) {
+      setAuthError(friendlyAuthError(err as AuthError));
+      setSaving(false);
+    }
   };
 
-  const clearError = (field: string) =>
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
+  // ── Returning student ─────────────────────────────────────────────────────
+  const handleReturnSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setAuthError('');
+    if (!retEmail.trim() || !retPassword) { setAuthError('Enter your email and password.'); return; }
+
+    setSaving(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, retEmail.trim().toLowerCase(), retPassword);
+      const prof = await getUserProfile(cred.user.uid);
+      if (!prof || prof.role !== 'student') {
+        await auth.signOut();
+        setAuthError('This account is not a student account.');
+        setSaving(false);
+        return;
+      }
+      sessionStorage.setItem('studentProfile', JSON.stringify({ ...prof }));
+      router.push('/student/chatbot');
+    } catch (err) {
+      setAuthError(friendlyAuthError(err as AuthError));
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
         <Logo />
         <button
           onClick={() => router.push('/student')}
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
@@ -182,13 +206,12 @@ function StudentInfoForm() {
         </button>
       </header>
 
-      {/* Main */}
       <main className="flex-1 flex flex-col items-center px-6 py-14">
         <div className="w-full max-w-md">
           <StepBar current={1} />
 
           {/* University badge */}
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-white/8 bg-slate-900/50 mb-8">
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-white/8 bg-slate-900/50 mb-6">
             <div className="w-7 h-7 rounded-lg bg-sky/15 border border-sky/25 flex items-center justify-center shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
@@ -202,75 +225,109 @@ function StudentInfoForm() {
             <span className="ml-auto text-xs text-slate-600 shrink-0">{university.domain}</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-white mb-1">Tell us about yourself</h1>
-          <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-            We only need three things to personalise your scheduling experience.
-          </p>
+          {/* Mode toggle */}
+          <div className="flex rounded-xl border border-white/10 bg-slate-900/40 p-1 mb-8">
+            {(['new', 'returning'] as const).map((m) => (
+              <button key={m} onClick={() => { setMode(m); setAuthError(''); setErrors({}); }}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                  mode === m ? 'bg-sky text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                }`}>
+                {m === 'new' ? 'New student' : 'Returning student'}
+              </button>
+            ))}
+          </div>
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-5">
-            {/* Name */}
-            <Field label="Full name" error={errors.name}>
-              <input
-                type="text"
-                placeholder="e.g. Jordan Smith"
-                value={name}
-                onChange={(e) => { setName(e.target.value); clearError('name'); }}
-                autoComplete="name"
-                className={inputCls(!!errors.name)}
-              />
-            </Field>
+          {/* ── New student ── */}
+          {mode === 'new' && (
+            <>
+              <h1 className="text-2xl font-bold text-white mb-1">Create your account</h1>
+              <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+                Your university email and student ID personalise your scheduling experience.
+              </p>
+              <form onSubmit={handleNewSubmit} noValidate className="space-y-5">
+                <Field label="Full name" error={errors.name}>
+                  <input type="text" placeholder="e.g. Jordan Smith" value={name}
+                    onChange={(e) => { setName(e.target.value); clearError('name'); }}
+                    autoComplete="name" className={inputCls(!!errors.name)} />
+                </Field>
+                <Field label="University email" hint={`Must end with @${university.domain}`} error={errors.email}>
+                  <input type="email" placeholder={`you@${university.domain}`} value={email}
+                    onChange={(e) => { setEmail(e.target.value); clearError('email'); }}
+                    autoComplete="email" className={inputCls(!!errors.email)} />
+                </Field>
+                <Field label="Student ID" error={errors.studentId}>
+                  <input type="text" placeholder="e.g. 123456789" value={studentId}
+                    onChange={(e) => { setStudentId(e.target.value); clearError('studentId'); }}
+                    autoComplete="off" className={inputCls(!!errors.studentId)} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Password" error={errors.password}>
+                    <input type="password" placeholder="Min 6 chars" value={password}
+                      onChange={(e) => { setPassword(e.target.value); clearError('password'); }}
+                      autoComplete="new-password" className={inputCls(!!errors.password)} />
+                  </Field>
+                  <Field label="Confirm" error={errors.confirmPassword}>
+                    <input type="password" placeholder="Repeat" value={confirmPassword}
+                      onChange={(e) => { setConfirmPassword(e.target.value); clearError('confirmPassword'); }}
+                      autoComplete="new-password" className={inputCls(!!errors.confirmPassword)} />
+                  </Field>
+                </div>
+                {authError && (
+                  <div className="px-3.5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm">
+                    {authError}
+                  </div>
+                )}
+                <button type="submit" disabled={saving}
+                  className="w-full mt-2 py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                  {saving ? 'Creating account…' : 'Create account & start chatbot'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </form>
+            </>
+          )}
 
-            {/* Email */}
-            <Field
-              label="University email"
-              hint={`Must end with @${university.domain}`}
-              error={errors.email}
-            >
-              <input
-                type="email"
-                placeholder={`you@${university.domain}`}
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); clearError('email'); }}
-                autoComplete="email"
-                className={inputCls(!!errors.email)}
-              />
-            </Field>
-
-            {/* Student ID */}
-            <Field label="Student ID" error={errors.studentId}>
-              <input
-                type="text"
-                placeholder="e.g. 123456789"
-                value={studentId}
-                onChange={(e) => { setStudentId(e.target.value); clearError('studentId'); }}
-                autoComplete="off"
-                className={inputCls(!!errors.studentId)}
-              />
-            </Field>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full mt-2 py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving…' : 'Start chatbot'}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
-          </form>
+          {/* ── Returning student ── */}
+          {mode === 'returning' && (
+            <>
+              <h1 className="text-2xl font-bold text-white mb-1">Welcome back</h1>
+              <p className="text-slate-400 text-sm mb-8">Sign in with your ScheduleAI student account.</p>
+              <form onSubmit={handleReturnSubmit} noValidate className="space-y-5">
+                <Field label="University email" error={undefined}>
+                  <input type="email" placeholder={`you@${university.domain}`} value={retEmail}
+                    onChange={(e) => setRetEmail(e.target.value)}
+                    autoComplete="email" className={inputCls(false)} />
+                </Field>
+                <Field label="Password" error={undefined}>
+                  <input type="password" placeholder="••••••••" value={retPassword}
+                    onChange={(e) => setRetPassword(e.target.value)}
+                    autoComplete="current-password" className={inputCls(false)} />
+                </Field>
+                {authError && (
+                  <div className="px-3.5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm">
+                    {authError}
+                  </div>
+                )}
+                <button type="submit" disabled={saving}
+                  className="w-full mt-2 py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                  {saving ? 'Signing in…' : 'Sign in & go to chatbot'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </form>
+            </>
+          )}
 
           <p className="mt-6 text-xs text-slate-600 text-center leading-relaxed">
-            Your profile is saved to the database. Real authentication comes in Phase 10.
+            Secured with Firebase Authentication · Passwords are never stored in plain text
           </p>
         </div>
       </main>
     </div>
   );
 }
-
-// ─── Page export (Suspense required for useSearchParams in App Router) ────────
 
 export default function StudentInfoPage() {
   return (

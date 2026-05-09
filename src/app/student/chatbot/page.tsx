@@ -12,6 +12,7 @@ interface StudentProfile {
   email: string;
   studentId: string;
   universityName: string;
+  universityId?: string;
 }
 
 type Modality = 'online' | 'hybrid' | 'in-person';
@@ -424,10 +425,11 @@ export default function StudentChatbotPage() {
         if (profile) {
           const stored = sessionStorage.getItem('studentProfile');
           const sp = stored ? JSON.parse(stored) : {};
+          const universityId = sp.universityId ?? profile.universityId ?? '';
           saveScheduleRequest(
             profile.email,
             profile.name,
-            sp.universityId ?? '',
+            universityId,
             profile.universityName,
             {
               courses: prefs.courses,

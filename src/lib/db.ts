@@ -314,6 +314,38 @@ export async function getAllProfessorFeedback(): Promise<ProfessorFeedbackDoc[]>
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessorFeedbackDoc));
 }
 
+// ─── User profiles (Firebase Auth UID-keyed) ─────────────────────────────────
+
+export type UserRole = 'student' | 'admin' | 'normal_user';
+
+export interface UserProfileDoc {
+  uid: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  universityId?: string;
+  universityName?: string;
+  studentId?: string;
+  domain?: string;
+}
+
+export async function saveUserProfile(
+  uid: string,
+  data: Omit<UserProfileDoc, 'uid'>
+): Promise<void> {
+  await setDoc(
+    doc(db, COL.users, uid),
+    { ...data, updatedAt: serverTimestamp(), createdAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
+export async function getUserProfile(uid: string): Promise<UserProfileDoc | null> {
+  const snap = await getDoc(doc(db, COL.users, uid));
+  if (!snap.exists()) return null;
+  return { uid, ...snap.data() } as UserProfileDoc;
+}
+
 // ─── Admin accounts ───────────────────────────────────────────────────────────
 
 export interface AdminAccount {
