@@ -11,9 +11,11 @@ import {
   getAllScheduleRequests,
   getAllUniversities,
   getAllProfessorFeedback,
+  getBugReports,
   ScheduleRequestDoc,
   UniversityDoc,
   ProfessorFeedbackDoc,
+  BugReportDoc,
 } from '@/lib/db';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -177,6 +179,8 @@ export default function AdminDashboard() {
   const [requests, setRequests] = useState<ScheduleRequestDoc[]>([]);
   const [universities, setUniversities] = useState<UniversityDoc[]>([]);
   const [feedback, setFeedback] = useState<ProfessorFeedbackDoc[]>([]);
+  const [bugReports, setBugReports] = useState<BugReportDoc[]>([]);
+  const [activeTab, setActiveTab] = useState<'analytics' | 'bugs'>('analytics');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedUnivId, setSelectedUnivId] = useState('all');
@@ -191,14 +195,16 @@ export default function AdminDashboard() {
     setLoading(true);
     setError('');
     try {
-      const [reqs, univs, fbs] = await Promise.all([
+      const [reqs, univs, fbs, bugs] = await Promise.all([
         getAllScheduleRequests(),
         getAllUniversities(),
         getAllProfessorFeedback(),
+        getBugReports(),
       ]);
       setRequests(reqs);
       setUniversities(univs);
       setFeedback(fbs);
+      setBugReports(bugs);
     } catch (err) {
       console.error(err);
       setError('Failed to load data. Check your connection and try again.');
@@ -268,6 +274,38 @@ export default function AdminDashboard() {
         </div>
       </header>
 
+      {/* Tab bar */}
+      <div className="border-b border-white/5 bg-midnight/60">
+        <div className="px-8 max-w-7xl mx-auto flex gap-1 pt-2">
+          {(['analytics', 'bugs'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all ${
+                activeTab === tab
+                  ? 'text-white border-b-2 border-sky'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {tab === 'analytics' ? 'Schedule Analytics' : (
+                <span className="flex items-center gap-2">
+                  Bug Reports
+                  {bugReports.length > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      bugReports.some(b => b.severity === 'high')
+                        ? 'bg-red-500/20 text-red-400'
+                        : 'bg-slate-700 text-slate-400'
+                    }`}>
+                      {bugReports.length}
+                    </span>
+                  )}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <main className="px-8 py-8 max-w-7xl mx-auto">
         {error && (
           <div className="mb-6 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm">
@@ -275,37 +313,38 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Total Requests" value={stats.totalRequests} color="sky" />
-          <StatCard label="Unique Students" value={stats.uniqueStudents} color="emerald" />
-          <StatCard label="Universities" value={stats.uniqueUniversities} color="violet" />
-          <StatCard label="Courses Tracked" value={stats.uniqueCourses} color="amber" />
-        </div>
-
-        {stats.totalRequests === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Course demand table — 2 columns wide */}
-            <div className="lg:col-span-2">
-              <CourseDemandTable courses={stats.courseStats} totalRequests={stats.totalRequests} />
+        {activeTab === 'analytics' ? (
+          <>
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              <StatCard label="Total Requests" value={stats.totalRequests} color="sky" />
+              <StatCard label="Unique Students" value={stats.uniqueStudents} color="emerald" />
+              <StatCard label="Universities" value={stats.uniqueUniversities} color="violet" />
+              <StatCard label="Courses Tracked" value={stats.uniqueCourses} color="amber" />
             </div>
 
-            {/* Right sidebar */}
-            <div className="space-y-5">
-              <ProfessorDemandPanel professors={stats.professorStats} />
-              <TimePreferencesPanel timeSlots={stats.timeSlots} totalRequests={stats.totalRequests} />
-              <DayPreferencesPanel days={stats.dayStats} />
-            </div>
-
-            {/* Professor feedback panel — full width */}
-            {filteredFeedback.length > 0 && (
-              <div className="lg:col-span-3">
-                <ProfessorFeedbackPanel feedback={filteredFeedback} />
+            {stats.totalRequests === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <CourseDemandTable courses={stats.courseStats} totalRequests={stats.totalRequests} />
+                </div>
+                <div className="space-y-5">
+                  <ProfessorDemandPanel professors={stats.professorStats} />
+                  <TimePreferencesPanel timeSlots={stats.timeSlots} totalRequests={stats.totalRequests} />
+                  <DayPreferencesPanel days={stats.dayStats} />
+                </div>
+                {filteredFeedback.length > 0 && (
+                  <div className="lg:col-span-3">
+                    <ProfessorFeedbackPanel feedback={filteredFeedback} />
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
+        ) : (
+          <BugReportsPanel reports={bugReports} />
         )}
 
         <p className="mt-12 text-center text-slate-700 text-xs">
@@ -695,6 +734,153 @@ function EmptyState() {
           <path d="m9 18 6-6-6-6" />
         </svg>
       </Link>
+    </div>
+  );
+}
+
+function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
+  const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const sorted = [...reports].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  const filtered = filter === 'all' ? sorted : sorted.filter((r) => r.severity === filter);
+
+  const severityBadge: Record<string, string> = {
+    high:   'bg-red-500/15 text-red-400 border border-red-500/30',
+    medium: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
+    low:    'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
+  };
+
+  const counts = {
+    high:   reports.filter((r) => r.severity === 'high').length,
+    medium: reports.filter((r) => r.severity === 'medium').length,
+    low:    reports.filter((r) => r.severity === 'low').length,
+  };
+
+  return (
+    <div>
+      {/* Summary row */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          {(['all', 'high', 'medium', 'low'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                filter === f
+                  ? 'bg-white/10 text-white'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {f === 'all' ? `All (${reports.length})` : (
+                <span className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${
+                    f === 'high' ? 'bg-red-400' : f === 'medium' ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`} />
+                  {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+          <h3 className="text-white font-semibold mb-2">No bug reports</h3>
+          <p className="text-slate-400 text-sm">
+            {filter === 'all' ? 'No errors have been reported yet.' : `No ${filter}-severity reports.`}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/8 bg-slate-900/40 overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/5">
+            <h2 className="text-white font-semibold">Bug Reports</h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              AI-analyzed crash reports from user sessions · {filtered.length} {filtered.length === 1 ? 'report' : 'reports'}
+            </p>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {filtered.map((report) => (
+              <div key={report.id}>
+                <button
+                  onClick={() => setExpanded(expanded === report.id ? null : report.id)}
+                  className="w-full px-6 py-4 text-left hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className={`shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${severityBadge[report.severity] ?? ''}`}>
+                      {report.severity}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-200 text-sm leading-snug line-clamp-2">{report.aiSummary}</p>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-600">
+                        <span>{new Date(report.timestamp).toLocaleString()}</span>
+                        <span>·</span>
+                        <span className="font-mono truncate max-w-[120px]">{report.sessionId}</span>
+                        {report.lastUserAction && (
+                          <>
+                            <span>·</span>
+                            <span className="truncate max-w-[200px]">Last action: "{report.lastUserAction}"</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round"
+                      className={`shrink-0 text-slate-600 transition-transform mt-1 ${expanded === report.id ? 'rotate-180' : ''}`}
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </div>
+                </button>
+
+                {expanded === report.id && (
+                  <div className="px-6 pb-5 space-y-4 bg-slate-950/40">
+                    {/* Suggested fix */}
+                    <div className="p-3.5 rounded-xl border border-sky/20 bg-sky/5">
+                      <p className="text-[11px] font-semibold text-sky uppercase tracking-wider mb-1">Suggested Fix</p>
+                      <p className="text-slate-300 text-sm leading-relaxed">{report.suggestedFix}</p>
+                    </div>
+
+                    {/* Error message */}
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Error</p>
+                      <pre className="text-xs text-red-300 bg-slate-950/60 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap border border-white/5">
+                        {report.errorMessage}
+                      </pre>
+                    </div>
+
+                    {/* Stack trace */}
+                    {report.stackTrace && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Stack Trace</p>
+                        <pre className="text-[11px] text-slate-400 bg-slate-950/60 rounded-lg p-3 overflow-x-auto max-h-48 whitespace-pre-wrap border border-white/5">
+                          {report.stackTrace.slice(0, 2000)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* URL */}
+                    {report.url && (
+                      <p className="text-xs text-slate-600">
+                        Page: <span className="text-slate-400 font-mono">{report.url}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

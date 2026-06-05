@@ -76,11 +76,13 @@ export async function createGCalEvent(
   const date = thisWeekDate(event.day);
   if (!date) throw new Error(`Unknown day: ${event.day}`);
 
-  const toISO = (minutes: number) => {
-    const dt = new Date(date);
-    dt.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-    return dt.toISOString();
-  };
+  const startDt = new Date(date);
+  startDt.setHours(Math.floor(event.startMinutes / 60), event.startMinutes % 60, 0, 0);
+
+  const endDt = new Date(date);
+  endDt.setHours(Math.floor(event.endMinutes / 60), event.endMinutes % 60, 0, 0);
+  // handle cross-midnight events
+  if (endDt <= startDt) endDt.setDate(endDt.getDate() + 1);
 
   const res = await fetch(`${BASE}/calendars/primary/events`, {
     method: 'POST',
@@ -90,14 +92,47 @@ export async function createGCalEvent(
     },
     body: JSON.stringify({
       summary: event.title,
-      start: { dateTime: toISO(event.startMinutes) },
-      end: { dateTime: toISO(event.endMinutes) },
+      start: { dateTime: startDt.toISOString() },
+      end: { dateTime: endDt.toISOString() },
     }),
   });
 
-  if (!res.ok) throw new Error(`Create failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status}: ${body}`);
+  }
   const data = await res.json();
   return data.id as string;
+}
+
+export async function updateGCalEvent(
+  accessToken: string,
+  googleEventId: string,
+  event: { title: string; day: string; startMinutes: number; endMinutes: number }
+): Promise<void> {
+  const date = thisWeekDate(event.day);
+  if (!date) throw new Error(`Unknown day: ${event.day}`);
+
+  const startDt = new Date(date);
+  startDt.setHours(Math.floor(event.startMinutes / 60), event.startMinutes % 60, 0, 0);
+  const endDt = new Date(date);
+  endDt.setHours(Math.floor(event.endMinutes / 60), event.endMinutes % 60, 0, 0);
+  if (endDt <= startDt) endDt.setDate(endDt.getDate() + 1);
+
+  const res = await fetch(`${BASE}/calendars/primary/events/${encodeURIComponent(googleEventId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: event.title,
+      start: { dateTime: startDt.toISOString() },
+      end: { dateTime: endDt.toISOString() },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status}: ${body}`);
+  }
 }
 
 export async function deleteGCalEvent(accessToken: string, googleEventId: string): Promise<void> {

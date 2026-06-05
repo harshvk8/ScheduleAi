@@ -24,6 +24,7 @@ const COL = {
   professors: 'professors',
   professorFeedback: 'professorFeedback',
   adminAccounts: 'adminAccounts',
+  bugReports: 'bugReports',
 } as const;
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
@@ -379,4 +380,38 @@ export async function getAdminAccount(email: string): Promise<AdminAccount | nul
   const snap = await getDoc(doc(db, COL.adminAccounts, docId));
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as AdminAccount;
+}
+
+// ─── bugReports ───────────────────────────────────────────────────────────────
+
+export interface BugReportDoc {
+  id: string;
+  sessionId: string;
+  timestamp: string;
+  errorMessage: string;
+  stackTrace: string;
+  componentStack: string;
+  lastUserAction: string;
+  eventsSnapshot: string;
+  url: string;
+  aiSummary: string;
+  severity: 'low' | 'medium' | 'high';
+  suggestedFix: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createdAt: any;
+}
+
+export async function saveBugReport(
+  report: Omit<BugReportDoc, 'id' | 'createdAt'>
+): Promise<string> {
+  const ref = await addDoc(collection(db, COL.bugReports), {
+    ...report,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function getBugReports(): Promise<BugReportDoc[]> {
+  const snap = await getDocs(collection(db, COL.bugReports));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BugReportDoc));
 }
