@@ -285,6 +285,7 @@ function NormalUserPage() {
   const [typing, setTyping] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [googleToken, setGoogleToken] = useState<string | null>(null);
+  const [webcalCopied, setWebcalCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [editForm, setEditForm] = useState({ title: '', day: '', startTime: '', endTime: '' });
@@ -411,6 +412,33 @@ function NormalUserPage() {
       setSyncing(false);
     }
   }, [googleToken, events]);
+
+  // ── Apple Calendar / iCal export ──────────────────────────────────────────
+
+  const handleSubscribeApple = useCallback(() => {
+    const sessionId = getOrCreateSessionId();
+    window.location.href = `webcal://${window.location.host}/api/calendar/feed?session=${sessionId}`;
+  }, []);
+
+  const handleCopyWebcal = useCallback(async () => {
+    const sessionId = getOrCreateSessionId();
+    const url = `webcal://${window.location.host}/api/calendar/feed?session=${sessionId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setWebcalCopied(true);
+      setTimeout(() => setWebcalCopied(false), 2500);
+    } catch {
+      prompt('Copy this URL to subscribe in any calendar app:', url);
+    }
+  }, []);
+
+  const handleDownloadIcs = useCallback(() => {
+    const sessionId = getOrCreateSessionId();
+    const a = document.createElement('a');
+    a.href = `/api/calendar/feed?session=${sessionId}`;
+    a.download = 'schedule.ics';
+    a.click();
+  }, []);
 
   const disconnect = useCallback(() => {
     setGoogleToken(null);
@@ -768,6 +796,40 @@ function NormalUserPage() {
                   <p className="text-[10px] text-slate-600 text-center">{googleCount} Google event{googleCount !== 1 ? 's' : ''} shown (dashed border)</p>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Apple Calendar / iCal export */}
+          <div className="shrink-0 px-3 py-3 border-b border-white/5 bg-slate-950/30 space-y-2">
+            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Export Schedule</p>
+            <button
+              onClick={handleSubscribeApple}
+              disabled={internalCount === 0}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 bg-slate-900/60 text-slate-300 text-xs hover:border-sky/30 hover:text-sky disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              Subscribe in Apple Calendar
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopyWebcal}
+                disabled={internalCount === 0}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-slate-300 text-[11px] hover:border-sky/30 hover:text-sky disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                {webcalCopied ? '✓ Copied!' : 'Copy webcal URL'}
+              </button>
+              <button
+                onClick={handleDownloadIcs}
+                disabled={internalCount === 0}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-white/10 text-slate-300 text-[11px] hover:border-sky/30 hover:text-sky disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Download .ics
+              </button>
+            </div>
+            {internalCount === 0 && (
+              <p className="text-[10px] text-slate-600 text-center">Add events to enable export</p>
             )}
           </div>
 

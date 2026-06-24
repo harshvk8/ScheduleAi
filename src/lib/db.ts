@@ -170,6 +170,29 @@ export async function saveCalendarEvents(
   await batch.commit();
 }
 
+export async function getCalendarEventsBySession(sessionId: string): Promise<Array<{
+  id: string;
+  day: string;
+  startMinutes: number;
+  endMinutes: number;
+  title: string;
+  category: string;
+}>> {
+  const q = query(
+    collection(db, COL.calendarEvents),
+    where('sessionId', '==', sessionId)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<{
+    id: string;
+    day: string;
+    startMinutes: number;
+    endMinutes: number;
+    title: string;
+    category: string;
+  }>;
+}
+
 export async function deleteCalendarEventsBySession(sessionId: string) {
   const q = query(
     collection(db, COL.calendarEvents),

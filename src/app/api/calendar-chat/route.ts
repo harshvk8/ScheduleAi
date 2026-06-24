@@ -186,7 +186,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         {
           type: 'text',
           text: SYSTEM,
-          // @ts-expect-error cache_control is a valid beta field
           cache_control: { type: 'ephemeral' },
         },
       ],
