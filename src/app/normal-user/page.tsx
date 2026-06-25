@@ -735,7 +735,6 @@ function NormalUserPage() {
           <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
             <div>
               <h2 className="text-sm font-semibold text-white">AI Schedule Assistant</h2>
-              <p className="text-[10px] text-slate-600 mt-0.5">Powered by Claude</p>
             </div>
             {internalCount > 0 && (
               <button onClick={clearAll} className="text-[11px] text-slate-600 hover:text-red-400 transition-colors">Clear all</button>
