@@ -49,34 +49,10 @@ const CAT_STYLE: Record<EventCategory, { bg: string; border: string; text: strin
   routine:  { bg: 'bg-slate-500/25',   border: 'border-slate-400/50',   text: 'text-slate-300'   },
 };
 
-const DAY_MAP: Record<string, string> = {
-  monday: 'Monday', mon: 'Monday',
-  tuesday: 'Tuesday', tue: 'Tuesday', tues: 'Tuesday',
-  wednesday: 'Wednesday', wed: 'Wednesday',
-  thursday: 'Thursday', thu: 'Thursday', thur: 'Thursday', thurs: 'Thursday',
-  friday: 'Friday', fri: 'Friday',
-  saturday: 'Saturday', sat: 'Saturday',
-  sunday: 'Sunday', sun: 'Sunday',
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function parseTimeStr(raw: string): number | null {
-  const s = raw.trim().toLowerCase().replace(/\./g, '');
-  if (s === 'noon') return 12 * 60;
-  if (s === 'midnight') return 0;
-  const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (!m) return null;
-  let h = parseInt(m[1]);
-  const min = m[2] ? parseInt(m[2]) : 0;
-  const mer = m[3];
-  if (mer === 'pm' && h !== 12) h += 12;
-  else if (mer === 'am' && h === 12) h = 0;
-  return h * 60 + min;
 }
 
 function fmt(minutes: number): string {
@@ -96,10 +72,6 @@ function detectCategory(title: string): EventCategory {
   return 'personal';
 }
 
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 function minsToTimeInput(m: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
@@ -117,107 +89,6 @@ function detectConflicts(evs: ScheduleEvent[]): ScheduleEvent[] {
         ev.endMinutes > other.startMinutes
     ),
   }));
-}
-
-// ─── Fallback NL Parser (used when AI API unavailable) ───────────────────────
-
-function parseMessageFallback(
-  msg: string,
-  existing: ScheduleEvent[]
-): { events: ScheduleEvent[]; response: string } {
-  const lower = msg.toLowerCase();
-  const days = Object.entries(DAY_MAP)
-    .filter(([alias]) => new RegExp(`\\b${alias}\\b`).test(lower))
-    .map(([, day]) => day)
-    .filter((d, i, arr) => arr.indexOf(d) === i);
-
-  if (days.length === 0) {
-    return {
-      events: [],
-      response: 'Which day is this for? Try: "I work Monday from 9 AM to 5 PM".',
-    };
-  }
-
-  const created: ScheduleEvent[] = [];
-  const descriptions: string[] = [];
-
-  const addEvent = (title: string, start: number, end: number, forDays = days) => {
-    const category = detectCategory(title);
-    for (const day of forDays) {
-      created.push({ id: uid(), day, startMinutes: start, endMinutes: end, title, category });
-      descriptions.push(`${title} from ${fmt(start)} to ${fmt(end)} on ${day}`);
-    }
-  };
-
-  const addCmdRe = /\badd\s+(?:an?\s+)?(?:event\s+)?["']?([a-zA-Z][a-zA-Z0-9 ,'!?-]*?)["']?\s+(?:at|from)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+to\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
-  let dm: RegExpExecArray | null;
-  while ((dm = addCmdRe.exec(msg)) !== null) {
-    const rawTitle = dm[1].trim().replace(/\s+/g, ' ');
-    if (!rawTitle || Object.keys(DAY_MAP).includes(rawTitle.toLowerCase())) continue;
-    const start = parseTimeStr(dm[2]);
-    const end = parseTimeStr(dm[3]);
-    if (start === null || end === null) continue;
-    addEvent(capitalize(rawTitle), start, end);
-  }
-
-  const rangeRe = /([a-zA-Z][a-zA-Z\s]*?)\s+from\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+to\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
-  let rm: RegExpExecArray | null;
-  while ((rm = rangeRe.exec(msg)) !== null) {
-    let rawTitle = rm[1].trim()
-      .replace(/\b(i|i'm|going to|want to|need to)\s+/gi, '')
-      .replace(/\b(work|study|do|have|a)\s+$/i, (w) => {
-        const v = w.trim().toLowerCase();
-        return v === 'work' ? 'Work' : v === 'study' ? 'Study ' : '';
-      })
-      .trim();
-    if (!rawTitle || Object.keys(DAY_MAP).includes(rawTitle.toLowerCase())) continue;
-    const start = parseTimeStr(rm[2]);
-    const end = parseTimeStr(rm[3]);
-    if (start === null || end === null) continue;
-    const title = capitalize(rawTitle.replace(/^(i\s+)?(work(ing)?)\b/i, 'Work').trim());
-    addEvent(title || 'Event', start, end);
-  }
-
-  const afterWorkRe = /\b(?:study|learn|do|work on|practice|code)\s+([a-zA-Z][a-zA-Z0-9\s]*?)(?=\s+after\s+work|\s+afterwards)/i;
-  const afterWorkMatch = afterWorkRe.exec(msg);
-  if (afterWorkMatch) {
-    const subject = capitalize(afterWorkMatch[1].trim());
-    const allSoFar = [...existing, ...created];
-    const workEnd = allSoFar
-      .filter((e) => e.category === 'work' && days.includes(e.day))
-      .sort((a, b) => b.endMinutes - a.endMinutes)[0]?.endMinutes;
-    if (workEnd !== undefined) {
-      const start = workEnd + 60;
-      const end = start + 120;
-      const title = subject.toLowerCase().startsWith('study') ? subject : `Study ${subject}`;
-      const alreadyCovered = created.some((e) => e.title === title);
-      if (!alreadyCovered) addEvent(title, start, end);
-    }
-  }
-
-  if (created.length === 0) {
-    const atRe = /([a-zA-Z][a-zA-Z\s]*?)\s+(?:at|@)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s+for\s+(\d+(?:\.\d+)?)\s*(?:hour|hr)s?)?/gi;
-    let am: RegExpExecArray | null;
-    while ((am = atRe.exec(msg)) !== null) {
-      let rawTitle = am[1].trim().replace(/\b(i|i'm|going to|want to|need to|have\s+a?)\s*/gi, '').trim();
-      if (!rawTitle || DAYS.map((d) => d.toLowerCase()).includes(rawTitle.toLowerCase())) continue;
-      if (Object.keys(DAY_MAP).some((k) => rawTitle.toLowerCase().endsWith(k))) continue;
-      const start = parseTimeStr(am[2]);
-      if (start === null) continue;
-      const durationMins = am[3] ? Math.round(parseFloat(am[3]) * 60) : 60;
-      const end = start + durationMins;
-      addEvent(capitalize(rawTitle), start, end);
-    }
-  }
-
-  if (descriptions.length === 0) {
-    return {
-      events: [],
-      response: 'I need a specific time. Try: "I work Monday from 9 AM to 5 PM" or "Add gym Tuesday at 7 AM for 1 hour".',
-    };
-  }
-
-  return { events: created, response: `Got it — added ${descriptions.join(' and ')}.` };
 }
 
 // ─── Event block ──────────────────────────────────────────────────────────────
@@ -526,7 +397,7 @@ function NormalUserPage() {
         }),
       });
 
-      if (!res.ok) throw new Error(`API ${res.status}`);
+      if (!res.ok) throw new Error(`API_${res.status}`);
       const data: CalendarChatResponse = await res.json();
 
       setEvents((prev) => {
@@ -561,17 +432,12 @@ function NormalUserPage() {
 
       setMessages((prev) => [...prev, { role: 'assistant', text: data.reply }]);
       setSuggestions(data.suggestions ?? []);
-    } catch {
-      // Fallback to regex parser when API is unavailable
-      setEvents((prev) => {
-        const { events: newEvts, response } = parseMessageFallback(text, prev);
-        setMessages((msgs) => [...msgs, { role: 'assistant', text: response }]);
-        if (newEvts.length > 0) {
-          const sessionId = getOrCreateSessionId();
-          saveCalendarEvents(sessionId, newEvts).catch(console.error);
-        }
-        return detectConflicts([...prev, ...newEvts]);
-      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const assistantError = msg.includes('API_429')
+        ? "You're sending messages too quickly — give it a moment and try again."
+        : "Assistant is temporarily unavailable. Please try again in a moment.";
+      setMessages((prev) => [...prev, { role: 'assistant', text: assistantError }]);
     } finally {
       setTyping(false);
     }

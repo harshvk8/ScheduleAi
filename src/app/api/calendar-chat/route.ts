@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { minuteLimiter, dayLimiter, getIp } from '@/lib/ratelimit';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,6 +158,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
   }
 
+  const ip = getIp(req);
+  if (minuteLimiter) {
+    const { success } = await minuteLimiter.limit(ip);
+    if (!success) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+  if (dayLimiter) {
+    const { success } = await dayLimiter.limit(ip);
+    if (!success) return NextResponse.json({ error: 'Daily limit reached' }, { status: 429 });
+  }
+
   let body: CalendarChatRequest;
   try {
     body = await req.json();
@@ -165,7 +176,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { messages, currentEvents, googleConnected } = body;
+
+  // Reject oversized messages
+  const lastMsg = messages[messages.length - 1]?.content ?? '';
+  if (lastMsg.length > 500) {
+    return NextResponse.json({ error: 'Message too long (max 500 chars)' }, { status: 400 });
+  }
+
   const client = new Anthropic({ apiKey });
+
+  // Keep only the last 10 turns to cap per-call token cost
+  const trimmedMessages = messages.slice(-10);
 
   const contextMessages: Anthropic.MessageParam[] = [
     {
@@ -175,7 +196,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         `Google Calendar: ${googleConnected ? 'Connected' : 'Not connected'}\n[/CURRENT SCHEDULE]\n\nReady.`,
     },
     { role: 'assistant', content: 'Ready to help manage your schedule.' },
-    ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+    ...trimmedMessages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
   ];
 
   try {

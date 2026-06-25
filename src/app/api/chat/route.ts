@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { minuteLimiter, dayLimiter, getIp } from '@/lib/ratelimit';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,6 +202,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
   }
 
+  const ip = getIp(req);
+  if (minuteLimiter) {
+    const { success } = await minuteLimiter.limit(ip);
+    if (!success) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+  if (dayLimiter) {
+    const { success } = await dayLimiter.limit(ip);
+    if (!success) return NextResponse.json({ error: 'Daily limit reached' }, { status: 429 });
+  }
+
   let body: ChatApiRequest;
   try {
     body = await req.json();
@@ -208,7 +219,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { messages, currentPrefs, studentName, availableProfessors } = body;
+  const { currentPrefs, studentName, availableProfessors } = body;
+  // Reject oversized messages and trim history to last 10 turns
+  const lastMsg = body.messages[body.messages.length - 1]?.content ?? '';
+  if (lastMsg.length > 500) {
+    return NextResponse.json({ error: 'Message too long (max 500 chars)' }, { status: 400 });
+  }
+  const messages = body.messages.slice(-10);
 
   const client = new Anthropic({ apiKey });
 

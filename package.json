@@ -11,6 +11,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
     "@react-oauth/google": "^0.13.5",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "firebase": "^12.12.1",
     "next": "^14.2.35",
     "react": "18.3.1",

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { saveBugReport } from '@/lib/db';
+import { minuteLimiter, getIp } from '@/lib/ratelimit';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,12 @@ export interface BugReportRequest {
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ip = getIp(req);
+  if (minuteLimiter) {
+    const { success } = await minuteLimiter.limit(`bug:${ip}`);
+    if (!success) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   let body: BugReportRequest;
   try {
     body = await req.json();
