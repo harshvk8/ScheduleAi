@@ -14,9 +14,9 @@ export const minuteLimiter = redis
   ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(15, '1 m'), prefix: 'rl:min' })
   : null;
 
-// 100 requests per day per IP
+// 30 requests per day per IP
 export const dayLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '24 h'), prefix: 'rl:day' })
+  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, '24 h'), prefix: 'rl:day' })
   : null;
 
 export function getIp(req: Request): string {
