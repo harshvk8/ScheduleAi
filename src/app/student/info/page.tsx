@@ -8,6 +8,7 @@ import { saveUserProfile, getUserProfile } from '@/lib/db';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   AuthError,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -84,13 +85,15 @@ function friendlyAuthError(err: AuthError): string {
       return 'Enter a valid email address.';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
-      return 'Wrong password. Please try again.';
+      return 'Wrong email or password. Please try again.';
     case 'auth/user-not-found':
       return 'No account found. Register as a new student.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait and try again.';
+    case 'auth/operation-not-allowed':
+      return 'Email/password sign-in is not enabled — contact support.';
     default:
-      return 'Something went wrong. Please try again.';
+      return `Something went wrong (${err.code}). Please try again.`;
   }
 }
 
@@ -119,6 +122,8 @@ function StudentInfoForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [authError, setAuthError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   if (!university) {
     router.replace('/student');
@@ -164,6 +169,21 @@ function StudentInfoForm() {
     } catch (err) {
       setAuthError(friendlyAuthError(err as AuthError));
       setSaving(false);
+    }
+  };
+
+  // ── Forgot password ───────────────────────────────────────────────────────
+  const handleForgotPassword = async () => {
+    if (!retEmail.trim()) { setAuthError('Enter your email above first, then click Forgot password.'); return; }
+    setResetLoading(true);
+    setAuthError('');
+    try {
+      await sendPasswordResetEmail(auth, retEmail.trim().toLowerCase());
+      setResetSent(true);
+    } catch (err) {
+      setAuthError(friendlyAuthError(err as AuthError));
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -296,14 +316,30 @@ function StudentInfoForm() {
               <form onSubmit={handleReturnSubmit} noValidate className="space-y-5">
                 <Field label="University email" error={undefined}>
                   <input type="email" placeholder={`you@${university.domain}`} value={retEmail}
-                    onChange={(e) => setRetEmail(e.target.value)}
+                    onChange={(e) => { setRetEmail(e.target.value); setResetSent(false); }}
                     autoComplete="email" className={inputCls(false)} />
                 </Field>
-                <Field label="Password" error={undefined}>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-medium text-slate-300">Password</label>
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={resetLoading}
+                      className="text-xs text-sky hover:text-sky/80 transition-colors disabled:opacity-50"
+                    >
+                      {resetLoading ? 'Sending…' : 'Forgot password?'}
+                    </button>
+                  </div>
                   <input type="password" placeholder="••••••••" value={retPassword}
                     onChange={(e) => setRetPassword(e.target.value)}
                     autoComplete="current-password" className={inputCls(false)} />
-                </Field>
+                </div>
+                {resetSent && (
+                  <div className="px-3.5 py-2.5 rounded-xl border border-green-500/20 bg-green-500/10 text-green-400 text-sm">
+                    Password reset email sent — check your inbox.
+                  </div>
+                )}
                 {authError && (
                   <div className="px-3.5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm">
                     {authError}
