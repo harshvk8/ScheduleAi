@@ -313,7 +313,7 @@ const TIME_BADGE: Record<TimeLabel, string> = {
   Morning: 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30',
   Afternoon: 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/30',
   Evening: 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30',
-  Night: 'bg-slate-600/40 text-slate-300 ring-1 ring-slate-500/30',
+  Night: 'bg-slate-600/40 text-slate-600 dark:text-slate-300 ring-1 ring-slate-500/30',
 };
 
 const MODALITY_BADGE: Record<Modality, string> = {
@@ -605,7 +605,7 @@ export default function StudentChatbotPage() {
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
       {/* ── Header ── */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/5 shrink-0">
         <div className="flex items-center gap-3">
           <Logo />
           {!aiEnabled && (
@@ -615,17 +615,17 @@ export default function StudentChatbotPage() {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-slate-900/60">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/8 bg-white/90 dark:bg-slate-900/60">
             <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/25 flex items-center justify-center text-sky-400 font-bold text-xs">
               {profile.name.charAt(0).toUpperCase()}
             </div>
-            <span className="text-xs text-slate-400 font-medium">{profile.name.split(' ')[0]}</span>
-            <span className="text-slate-600 text-xs">·</span>
-            <span className="text-xs text-slate-500">{profile.universityName}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{profile.name.split(' ')[0]}</span>
+            <span className="text-slate-500 dark:text-slate-600 text-xs">·</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">{profile.universityName}</span>
           </div>
           <button
             onClick={() => router.push('/student/info')}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300 transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m15 18-6-6 6-6" />
@@ -637,14 +637,14 @@ export default function StudentChatbotPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* ════════════════════════ LEFT — Chat ════════════════════════ */}
-        <div className="w-[42%] flex flex-col border-r border-white/5">
+        <div className="w-[42%] flex flex-col border-r border-slate-100 dark:border-white/5">
           {/* Progress */}
-          <div className="px-5 pt-4 pb-3 border-b border-white/5 shrink-0">
+          <div className="px-5 pt-4 pb-3 border-b border-slate-100 dark:border-white/5 shrink-0">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-400 dark:text-slate-500">
                 {isDone ? 'Complete' : `Step ${Math.min(step + 1, STEPS.length)} of ${STEPS.length}`}
               </span>
-              <span className="text-xs text-slate-500">{progressPercent}%</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">{progressPercent}%</span>
             </div>
             <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
               <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
@@ -691,7 +691,7 @@ export default function StudentChatbotPage() {
           </div>
 
           {/* Input */}
-          <div className="px-4 py-3 border-t border-white/5 shrink-0">
+          <div className="px-4 py-3 border-t border-slate-100 dark:border-white/5 shrink-0">
             {isDone ? (
               <button onClick={() => router.push('/')} className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors">
                 Return to Home
@@ -704,7 +704,7 @@ export default function StudentChatbotPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder='Type your answer, or "done" to finish…'
-                  className="flex-1 bg-gray-800 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/20 transition"
+                  className="flex-1 bg-gray-800 border border-slate-200 dark:border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/20 transition"
                 />
                 <button
                   onClick={send}
@@ -727,7 +727,7 @@ export default function StudentChatbotPage() {
         <div className="flex-1 overflow-y-auto bg-gray-900/40">
           {!hasAnyPrefs && conflicts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-10">
-              <div className="w-14 h-14 rounded-2xl bg-gray-800 border border-white/8 flex items-center justify-center mb-4">
+              <div className="w-14 h-14 rounded-2xl bg-gray-800 border border-slate-200 dark:border-white/8 flex items-center justify-center mb-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
                 </svg>
@@ -772,7 +772,7 @@ export default function StudentChatbotPage() {
                   <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Courses</h2>
                   <div className="space-y-2.5">
                     {prefs.courses.map((c) => (
-                      <div key={c.course} className="bg-gray-800/70 border border-white/5 rounded-2xl px-4 py-3.5">
+                      <div key={c.course} className="bg-gray-800/70 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5">
                         <div className="flex items-start justify-between gap-3 mb-2.5">
                           <div>
                             <span className="text-sm font-bold text-white tracking-wide">{c.course}</span>
@@ -824,10 +824,10 @@ export default function StudentChatbotPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-semibold text-sky-300">{rec.professor}</span>
-                            <span className="text-[10px] text-slate-600">for</span>
-                            <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{rec.course}</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-600">for</span>
+                            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{rec.course}</span>
                           </div>
-                          <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">{rec.reason}</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">{rec.reason}</p>
                         </div>
                       </div>
                     ))}
@@ -844,7 +844,7 @@ export default function StudentChatbotPage() {
                 prefs.constraints.length > 0) && (
                 <section>
                   <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">General Preferences</h2>
-                  <div className="bg-gray-800/70 border border-white/5 rounded-2xl px-4 py-3.5 space-y-3">
+                  <div className="bg-gray-800/70 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5 space-y-3">
                     {(prefs.generalPreferTimes.length > 0 || prefs.generalAvoidTimes.length > 0) && (
                       <div>
                         <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Time of Day</p>
@@ -925,7 +925,7 @@ export default function StudentChatbotPage() {
               {hasAnyPrefs && (
                 <section>
                   <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Availability Overview</h2>
-                  <div className="bg-gray-800/70 border border-white/5 rounded-2xl p-4 overflow-x-auto">
+                  <div className="bg-gray-800/70 border border-slate-100 dark:border-white/5 rounded-2xl p-4 overflow-x-auto">
                     <table className="w-full text-center" style={{ minWidth: 340 }}>
                       <thead>
                         <tr>
@@ -951,7 +951,7 @@ export default function StudentChatbotPage() {
                         ))}
                       </tbody>
                     </table>
-                    <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-white/5">
+                    <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-white/5">
                       {[
                         { label: 'Available', cls: 'bg-gray-700' },
                         { label: 'Preferred', cls: 'bg-emerald-900/60 border border-emerald-700/50' },
@@ -975,7 +975,7 @@ export default function StudentChatbotPage() {
                     <summary className="cursor-pointer text-[11px] font-semibold text-gray-600 uppercase tracking-widest hover:text-gray-400 transition-colors select-none">
                       Extracted JSON
                     </summary>
-                    <pre className="mt-2 bg-gray-900 border border-white/5 rounded-xl p-3 text-[10px] text-gray-400 overflow-x-auto leading-relaxed">
+                    <pre className="mt-2 bg-gray-900 border border-slate-100 dark:border-white/5 rounded-xl p-3 text-[10px] text-gray-400 overflow-x-auto leading-relaxed">
                       {JSON.stringify(
                         {
                           studentName: profile.name,

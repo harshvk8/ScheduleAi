@@ -35,7 +35,7 @@ function friendlyError(err: AuthError): string {
 }
 
 const inputCls =
-  'w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors';
+  'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -110,11 +110,11 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
         <Logo />
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
@@ -132,13 +132,13 @@ export default function AdminPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Admin portal</h1>
-          <p className="text-slate-400 text-sm">University administrators only</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">University administrators only</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-2xl">
 
           {/* Sign In */}
-          <div className="p-7 rounded-2xl border border-white/10 bg-slate-900/50 flex flex-col">
+          <div className="p-7 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/50 flex flex-col">
             <div className="flex items-center gap-2.5 mb-6">
               <div className="w-7 h-7 rounded-lg bg-sky/10 border border-sky/20 flex items-center justify-center shrink-0">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -149,18 +149,18 @@ export default function AdminPage() {
               </div>
               <div>
                 <h2 className="text-white font-semibold text-sm">Sign in</h2>
-                <p className="text-slate-500 text-xs">Access your dashboard</p>
+                <p className="text-slate-400 dark:text-slate-500 text-xs">Access your dashboard</p>
               </div>
             </div>
 
             <form onSubmit={handleLogin} className="flex flex-col flex-1 gap-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium">Email</label>
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Email</label>
                 <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="admin@university.edu" required className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium">Password</label>
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Password</label>
                 <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
                   placeholder="••••••••" required className={inputCls} />
               </div>
@@ -173,7 +173,7 @@ export default function AdminPage() {
           </div>
 
           {/* Register */}
-          <div className="p-7 rounded-2xl border border-white/10 bg-slate-900/50 flex flex-col">
+          <div className="p-7 rounded-2xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/50 flex flex-col">
             <div className="flex items-center gap-2.5 mb-6">
               <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -185,34 +185,34 @@ export default function AdminPage() {
               </div>
               <div>
                 <h2 className="text-white font-semibold text-sm">Create account</h2>
-                <p className="text-slate-500 text-xs">Register as university admin</p>
+                <p className="text-slate-400 dark:text-slate-500 text-xs">Register as university admin</p>
               </div>
             </div>
 
             <form onSubmit={handleRegister} className="flex flex-col flex-1 gap-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium">Full name</label>
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Full name</label>
                 <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)}
                   placeholder="Dr. Jane Smith" required className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium">University</label>
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">University</label>
                 <input type="text" value={regUniversity} onChange={(e) => setRegUniversity(e.target.value)}
                   placeholder="Montclair State University" required className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5 font-medium">Email</label>
+                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Email</label>
                 <input type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)}
                   placeholder="admin@university.edu" required className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Password</label>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Password</label>
                   <input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)}
                     placeholder="••••••" required className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5 font-medium">Confirm</label>
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Confirm</label>
                   <input type="password" value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)}
                     placeholder="••••••" required className={inputCls} />
                 </div>

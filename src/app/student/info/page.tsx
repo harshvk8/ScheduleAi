@@ -27,7 +27,7 @@ function StepBar({ current }: { current: number }) {
           <div key={label} className="flex items-center">
             <div className="flex flex-col items-center gap-1">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
-                done ? 'bg-sky text-white' : active ? 'bg-sky/20 border border-sky/50 text-sky' : 'bg-slate-800 border border-white/10 text-slate-500'
+                done ? 'bg-sky text-white' : active ? 'bg-sky/20 border border-sky/50 text-sky' : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500'
               }`}>
                 {done ? (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -35,10 +35,10 @@ function StepBar({ current }: { current: number }) {
                   </svg>
                 ) : i + 1}
               </div>
-              <span className={`text-[10px] ${active ? 'text-sky' : done ? 'text-slate-400' : 'text-slate-600'}`}>{label}</span>
+              <span className={`text-[10px] ${active ? 'text-sky' : done ? 'text-slate-500 dark:text-slate-400' : 'text-slate-500 dark:text-slate-600'}`}>{label}</span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`h-px w-12 sm:w-20 mx-1 mb-4 transition-colors ${i < current ? 'bg-sky/50' : 'bg-white/8'}`} />
+              <div className={`h-px w-12 sm:w-20 mx-1 mb-4 transition-colors ${i < current ? 'bg-sky/50' : 'bg-slate-200 dark:bg-white/8'}`} />
             )}
           </div>
         );
@@ -54,7 +54,7 @@ function Field({ label, hint, error, children }: {
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1.5">{label}</label>
+      <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">{label}</label>
       {children}
       {error ? (
         <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
@@ -64,15 +64,15 @@ function Field({ label, hint, error, children }: {
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-slate-600">{hint}</p>
+        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-600">{hint}</p>
       ) : null}
     </div>
   );
 }
 
 const inputCls = (hasError: boolean) =>
-  `w-full px-3.5 py-3 rounded-xl border text-sm text-white placeholder:text-slate-600 bg-slate-900/60 focus:outline-none focus:ring-1 transition-all ${
-    hasError ? 'border-red-500/50 focus:border-red-500/70 focus:ring-red-500/20' : 'border-white/10 focus:border-sky/50 focus:ring-sky/20'
+  `w-full px-3.5 py-3 rounded-xl border text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 bg-white dark:bg-slate-900/60 focus:outline-none focus:ring-1 transition-all ${
+    hasError ? 'border-red-500/50 focus:border-red-500/70 focus:ring-red-500/20' : 'border-slate-200 dark:border-white/10 focus:border-sky/50 focus:ring-sky/20'
   }`;
 
 function friendlyAuthError(err: AuthError): string {
@@ -213,11 +213,11 @@ function StudentInfoForm() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
         <Logo />
         <button
           onClick={() => router.push('/student')}
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
@@ -231,7 +231,7 @@ function StudentInfoForm() {
           <StepBar current={1} />
 
           {/* University badge */}
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-white/8 bg-slate-900/50 mb-6">
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/8 bg-white/95 dark:bg-slate-900/50 mb-6">
             <div className="w-7 h-7 rounded-lg bg-sky/15 border border-sky/25 flex items-center justify-center shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
@@ -239,18 +239,18 @@ function StudentInfoForm() {
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-slate-500">Selected university</p>
-              <p className="text-sm font-medium text-white truncate">{university.name}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Selected university</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{university.name}</p>
             </div>
-            <span className="ml-auto text-xs text-slate-600 shrink-0">{university.domain}</span>
+            <span className="ml-auto text-xs text-slate-500 dark:text-slate-600 shrink-0">{university.domain}</span>
           </div>
 
           {/* Mode toggle */}
-          <div className="flex rounded-xl border border-white/10 bg-slate-900/40 p-1 mb-8">
+          <div className="flex rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/40 p-1 mb-8">
             {(['new', 'returning'] as const).map((m) => (
               <button key={m} onClick={() => { setMode(m); setAuthError(''); setErrors({}); }}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  mode === m ? 'bg-sky text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  mode === m ? 'bg-sky text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                 }`}>
                 {m === 'new' ? 'New student' : 'Returning student'}
               </button>
@@ -260,8 +260,8 @@ function StudentInfoForm() {
           {/* ── New student ── */}
           {mode === 'new' && (
             <>
-              <h1 className="text-2xl font-bold text-white mb-1">Create your account</h1>
-              <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Create your account</h1>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
                 Your university email and student ID personalise your scheduling experience.
               </p>
               <form onSubmit={handleNewSubmit} noValidate className="space-y-5">
@@ -311,8 +311,8 @@ function StudentInfoForm() {
           {/* ── Returning student ── */}
           {mode === 'returning' && (
             <>
-              <h1 className="text-2xl font-bold text-white mb-1">Welcome back</h1>
-              <p className="text-slate-400 text-sm mb-8">Sign in with your ScheduleAI student account.</p>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Welcome back</h1>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Sign in with your ScheduleAI student account.</p>
               <form onSubmit={handleReturnSubmit} noValidate className="space-y-5">
                 <Field label="University email" error={undefined}>
                   <input type="email" placeholder={`you@${university.domain}`} value={retEmail}
@@ -321,7 +321,7 @@ function StudentInfoForm() {
                 </Field>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-sm font-medium text-slate-300">Password</label>
+                    <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Password</label>
                     <button
                       type="button"
                       onClick={handleForgotPassword}
@@ -356,7 +356,7 @@ function StudentInfoForm() {
             </>
           )}
 
-          <p className="mt-6 text-xs text-slate-600 text-center leading-relaxed">
+          <p className="mt-6 text-xs text-slate-500 dark:text-slate-600 text-center leading-relaxed">
             Secured with Firebase Authentication · Passwords are never stored in plain text
           </p>
         </div>

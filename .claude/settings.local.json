@@ -15,7 +15,12 @@
       "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\feedback\" -Force)",
       "Bash(npm install *)",
       "Bash(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\broos\\\\Desktop\\\\Scheduleai\\\\ScheduleAi\\\\src\\\\app\\\\api\\\\chat\" -Force)",
-      "Bash(Write-Output \"done\")"
+      "Bash(Write-Output \"done\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(awk '/^function parseMessageFallback/{start=NR} start && /^}$/{print start\"-\"NR; start=0; exit}' /Users/harshvardhan/Desktop/Projects/ScheduleAi/src/app/normal-user/page.tsx)",
+      "Bash(perl -i -pe ' *)"
     ],
     "additionalDirectories": [
       "\\mnt\\c\\Users\\broos\\Desktop\\Scheduleai\\ScheduleAi\\src\\app"

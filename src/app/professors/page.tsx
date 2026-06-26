@@ -183,15 +183,15 @@ export default function ProfessorsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="text-slate-600 text-sm">/</span>
-          <span className="text-slate-400 text-sm font-medium">Professors</span>
+          <span className="text-slate-500 dark:text-slate-600 text-sm">/</span>
+          <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Professors</span>
         </div>
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
@@ -201,7 +201,7 @@ export default function ProfessorsPage() {
       </header>
 
       {/* Search hero */}
-      <div className="px-8 py-12 border-b border-white/5 bg-slate-900/20">
+      <div className="px-8 py-12 border-b border-slate-100 dark:border-white/5 bg-slate-900/20">
         <div className="max-w-2xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 rounded-full border border-sky/30 bg-sky/10 text-sky text-xs font-medium">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -210,7 +210,7 @@ export default function ProfessorsPage() {
             Professor Search
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Find Professors</h1>
-          <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
             Search professors at your university and view student ratings &amp; demand
           </p>
 
@@ -218,7 +218,7 @@ export default function ProfessorsPage() {
             {/* Search input */}
             <div className="relative flex-1">
               <svg
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none"
                 width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
               >
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -228,7 +228,7 @@ export default function ProfessorsPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search professor name…"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder:text-slate-500 text-sm focus:outline-none focus:border-sky/40 transition-colors"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-400 dark:text-slate-500 text-sm focus:outline-none focus:border-sky/40 transition-colors"
               />
             </div>
 
@@ -236,7 +236,7 @@ export default function ProfessorsPage() {
             <select
               value={selectedUnivId}
               onChange={(e) => setSelectedUnivId(e.target.value)}
-              className="px-4 py-3 rounded-xl border border-white/10 bg-slate-900/60 text-slate-300 text-sm focus:outline-none focus:border-sky/40 cursor-pointer shrink-0"
+              className="px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 text-sm focus:outline-none focus:border-sky/40 cursor-pointer shrink-0"
             >
               <option value="all">All Universities</option>
               {universities.map((u) => (
@@ -255,12 +255,12 @@ export default function ProfessorsPage() {
           <>
             {/* Count label */}
             {!loading && (
-              <p className="text-slate-500 text-sm mb-6">
+              <p className="text-slate-400 dark:text-slate-500 text-sm mb-6">
                 {filtered.length === 0
                   ? 'No professors found'
                   : `${filtered.length} professor${filtered.length === 1 ? '' : 's'} found`}
                 {query && (
-                  <span> for &ldquo;<span className="text-slate-300">{query}</span>&rdquo;</span>
+                  <span> for &ldquo;<span className="text-slate-600 dark:text-slate-300">{query}</span>&rdquo;</span>
                 )}
               </p>
             )}
@@ -276,9 +276,9 @@ export default function ProfessorsPage() {
             )}
 
             {/* Rate a professor CTA */}
-            <div className="mt-12 text-center px-6 py-6 rounded-2xl border border-white/8 bg-slate-900/30 max-w-lg mx-auto">
+            <div className="mt-12 text-center px-6 py-6 rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/30 max-w-lg mx-auto">
               <p className="text-white text-sm font-semibold mb-1">Taken a class recently?</p>
-              <p className="text-slate-400 text-xs mb-4">
+              <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">
                 Share your experience and help other students choose the right professor.
               </p>
               <Link
@@ -309,7 +309,7 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
     .slice(0, 2);
 
   return (
-    <div className="flex flex-col p-6 rounded-2xl border border-white/8 bg-slate-900/50 hover:border-white/15 hover:-translate-y-0.5 transition-all duration-200">
+    <div className="flex flex-col p-6 rounded-2xl border border-slate-200 dark:border-white/8 bg-white/95 dark:bg-slate-900/50 hover:border-slate-200 dark:border-white/15 hover:-translate-y-0.5 transition-all duration-200">
       {/* Top row: avatar + name + demand badge */}
       <div className="flex items-start gap-4 mb-4">
         <div className="w-12 h-12 rounded-xl bg-sky/10 border border-sky/20 flex items-center justify-center shrink-0">
@@ -318,7 +318,7 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
         <div className="min-w-0 flex-1">
           <h3 className="text-white font-semibold text-base leading-tight truncate">{p.name}</h3>
           {p.universityName && (
-            <p className="text-slate-400 text-xs mt-0.5 truncate">{p.universityName}</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 truncate">{p.universityName}</p>
           )}
         </div>
         {p.requestCount > 0 && (
@@ -334,13 +334,13 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
           {p.courses.slice(0, 5).map((c) => (
             <span
               key={c}
-              className="px-2 py-0.5 rounded-md bg-slate-800 border border-white/5 text-slate-300 text-xs font-mono"
+              className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-100 dark:border-white/5 text-slate-600 dark:text-slate-300 text-xs font-mono"
             >
               {c}
             </span>
           ))}
           {p.courses.length > 5 && (
-            <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-500 text-xs">
+            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-xs">
               +{p.courses.length - 5} more
             </span>
           )}
@@ -357,7 +357,7 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
             <span className="text-3xl font-bold text-white">{p.avgRating.toFixed(1)}</span>
             <div>
               <StarRow rating={p.avgRating} />
-              <p className="text-slate-500 text-xs mt-1">
+              <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
                 {p.feedbackCount} {p.feedbackCount === 1 ? 'review' : 'reviews'}
               </p>
             </div>
@@ -379,13 +379,13 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
               <span className={p.wouldTakeAgainPct >= 60 ? 'text-emerald-400' : 'text-red-400'}>
                 {Math.round(p.wouldTakeAgainPct)}%
               </span>
-              <span className="text-slate-500"> would take again</span>
+              <span className="text-slate-400 dark:text-slate-500"> would take again</span>
             </p>
           )}
         </div>
       ) : (
-        <div className="mb-4 flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/5">
-          <p className="text-slate-600 text-xs">No ratings yet</p>
+        <div className="mb-4 flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.02] border border-slate-100 dark:border-white/5">
+          <p className="text-slate-500 dark:text-slate-600 text-xs">No ratings yet</p>
           <Link
             href={`/feedback?professor=${encodeURIComponent(p.name)}`}
             className="text-sky text-xs hover:text-sky/80 transition-colors"
@@ -401,7 +401,7 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
           {p.recentComments.slice(0, 2).map((comment, i) => (
             <blockquote
               key={i}
-              className="pl-3 border-l-2 border-white/10 text-slate-400 text-xs italic leading-relaxed"
+              className="pl-3 border-l-2 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 text-xs italic leading-relaxed"
             >
               &ldquo;{comment.length > 110 ? comment.slice(0, 110) + '…' : comment}&rdquo;
             </blockquote>
@@ -410,10 +410,10 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
       )}
 
       {/* Rate link */}
-      <div className="mt-auto pt-3 border-t border-white/5">
+      <div className="mt-auto pt-3 border-t border-slate-100 dark:border-white/5">
         <Link
           href={`/feedback?professor=${encodeURIComponent(p.name)}`}
-          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-white/8 text-slate-400 text-xs hover:border-sky/30 hover:text-sky transition-colors"
+          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-slate-200 dark:border-white/8 text-slate-500 dark:text-slate-400 text-xs hover:border-sky/30 hover:text-sky transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -452,14 +452,14 @@ function MiniBar({ label, value, max, green }: { label: string; value: number; m
   const pct = Math.round((value / max) * 100);
   return (
     <div className="flex items-center gap-2">
-      <span className="text-slate-600 text-xs w-16 shrink-0">{label}</span>
+      <span className="text-slate-500 dark:text-slate-600 text-xs w-16 shrink-0">{label}</span>
       <div className="flex-1 h-1 rounded-full bg-white/5">
         <div
           className={`h-full rounded-full ${green ? 'bg-sky/50' : 'bg-slate-600'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-slate-500 text-xs w-6 text-right">{value.toFixed(1)}</span>
+      <span className="text-slate-400 dark:text-slate-500 text-xs w-6 text-right">{value.toFixed(1)}</span>
     </div>
   );
 }
@@ -478,14 +478,14 @@ function EmptyState({ hasQuery }: { hasQuery: boolean }) {
       {hasQuery ? (
         <>
           <h3 className="text-white font-semibold text-xl mb-2">No professors found</h3>
-          <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+          <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed">
             No professors match your search. Try a different name or clear the filter.
           </p>
         </>
       ) : (
         <>
           <h3 className="text-white font-semibold text-xl mb-2">No professors yet</h3>
-          <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+          <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed">
             Professors appear here when students mention them in the scheduling chatbot. Be the first to submit your preferences.
           </p>
           <Link
@@ -507,7 +507,7 @@ function LoadingState() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       {[...Array(6)].map((_, i) => (
-        <div key={i} className="p-6 rounded-2xl border border-white/8 bg-slate-900/50 animate-pulse">
+        <div key={i} className="p-6 rounded-2xl border border-slate-200 dark:border-white/8 bg-white/95 dark:bg-slate-900/50 animate-pulse">
           <div className="flex items-start gap-4 mb-4">
             <div className="w-12 h-12 rounded-xl bg-white/5 shrink-0" />
             <div className="flex-1 space-y-2 pt-1">

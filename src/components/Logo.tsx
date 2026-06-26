@@ -12,7 +12,7 @@ export default function Logo() {
           <path d="m9 16 2 2 4-4" />
         </svg>
       </div>
-      <span className="text-lg font-bold text-white tracking-tight">ScheduleAI</span>
+      <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">ScheduleAI</span>
     </Link>
   );
 }

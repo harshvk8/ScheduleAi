@@ -48,7 +48,7 @@ function StarPicker({
           </button>
         ))}
       </div>
-      <div className="flex justify-between text-slate-600 text-xs">
+      <div className="flex justify-between text-slate-500 dark:text-slate-600 text-xs">
         <span>{low}</span>
         <span>{high}</span>
       </div>
@@ -72,10 +72,10 @@ function RatingRow({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-8 py-4 border-b border-white/5 last:border-0">
+    <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-8 py-4 border-b border-slate-100 dark:border-white/5 last:border-0">
       <div className="sm:w-52 shrink-0">
         <p className="text-white text-sm font-medium">{label}</p>
-        <p className="text-slate-500 text-xs mt-0.5">{description}</p>
+        <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">{description}</p>
       </div>
       <StarPicker value={value} onChange={onChange} low={low} high={high} />
     </div>
@@ -160,7 +160,7 @@ function FeedbackForm() {
           </svg>
         </div>
         <h2 className="text-white text-2xl font-bold mb-2">Thanks for your feedback!</h2>
-        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+        <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
           Your review of <span className="text-white font-medium">{professorName}</span> has been saved and will help other students make better decisions.
         </p>
         <div className="flex gap-3">
@@ -171,7 +171,7 @@ function FeedbackForm() {
               setAttendanceStrictness(null); setWouldTakeAgain(null); setComment('');
               setDone(false);
             }}
-            className="px-5 py-2.5 rounded-xl border border-white/10 text-slate-300 text-sm hover:border-white/20 hover:text-white transition-colors"
+            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-sm hover:border-slate-300 dark:border-white/20 hover:text-slate-900 dark:hover:text-white transition-colors"
           >
             Rate another professor
           </button>
@@ -189,41 +189,41 @@ function FeedbackForm() {
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold text-white mb-1">Rate a Professor</h1>
-      <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+      <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
         Your feedback is anonymous and helps students choose courses and professors that fit their learning style.
       </p>
 
       {/* Section: Who are you reviewing? */}
       <section className="mb-8">
-        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Who are you reviewing?</h2>
+        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Who are you reviewing?</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-slate-300 text-sm mb-1.5">Professor name <span className="text-red-400">*</span></label>
+            <label className="block text-slate-600 dark:text-slate-300 text-sm mb-1.5">Professor name <span className="text-red-400">*</span></label>
             <input
               type="text"
               value={professorName}
               onChange={(e) => setProfessorName(e.target.value)}
               placeholder="e.g. Professor Smith"
-              className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-slate-300 text-sm mb-1.5">Course code <span className="text-red-400">*</span></label>
+            <label className="block text-slate-600 dark:text-slate-300 text-sm mb-1.5">Course code <span className="text-red-400">*</span></label>
             <input
               type="text"
               value={courseCode}
               onChange={(e) => setCourseCode(e.target.value)}
               placeholder="e.g. CSIT 313"
-              className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
             />
           </div>
         </div>
         <div className="mt-4">
-          <label className="block text-slate-300 text-sm mb-1.5">University <span className="text-red-400">*</span></label>
+          <label className="block text-slate-600 dark:text-slate-300 text-sm mb-1.5">University <span className="text-red-400">*</span></label>
           <select
             value={universityId}
             onChange={(e) => setUniversityId(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-slate-900/60 text-slate-300 text-sm focus:outline-none focus:border-sky/40 transition-colors cursor-pointer"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 text-sm focus:outline-none focus:border-sky/40 transition-colors cursor-pointer"
           >
             <option value="">Select your university</option>
             {UNIVERSITIES.map((u) => (
@@ -234,8 +234,8 @@ function FeedbackForm() {
       </section>
 
       {/* Section: Ratings */}
-      <section className="mb-8 p-6 rounded-2xl border border-white/8 bg-slate-900/40">
-        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Ratings</h2>
+      <section className="mb-8 p-6 rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40">
+        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Ratings</h2>
 
         <RatingRow
           label="Overall rating"
@@ -281,7 +281,7 @@ function FeedbackForm() {
 
       {/* Would take again */}
       <section className="mb-8">
-        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Would you take this professor again?</h2>
+        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Would you take this professor again?</h2>
         <div className="flex gap-3">
           <button
             type="button"
@@ -289,7 +289,7 @@ function FeedbackForm() {
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-all ${
               wouldTakeAgain === true
                 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-                : 'border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300'
+                : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:border-white/20 hover:text-slate-600 dark:text-slate-300'
             }`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -303,7 +303,7 @@ function FeedbackForm() {
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-all ${
               wouldTakeAgain === false
                 ? 'border-red-500/40 bg-red-500/10 text-red-400'
-                : 'border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-300'
+                : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:border-white/20 hover:text-slate-600 dark:text-slate-300'
             }`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -316,16 +316,16 @@ function FeedbackForm() {
 
       {/* Written feedback */}
       <section className="mb-8">
-        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Written feedback <span className="text-slate-700 normal-case font-normal">(optional)</span></h2>
+        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Written feedback <span className="text-slate-700 normal-case font-normal">(optional)</span></h2>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Share your experience — what was the class like? What did you learn? Any tips for future students?"
           rows={5}
           maxLength={800}
-          className="w-full px-4 py-3 rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors resize-none leading-relaxed"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors resize-none leading-relaxed"
         />
-        <p className="text-slate-600 text-xs mt-1.5 text-right">{comment.length}/800</p>
+        <p className="text-slate-500 dark:text-slate-600 text-xs mt-1.5 text-right">{comment.length}/800</p>
       </section>
 
       {/* Error */}
@@ -353,7 +353,7 @@ function FeedbackForm() {
         )}
       </button>
 
-      <p className="text-slate-600 text-xs text-center mt-4">
+      <p className="text-slate-500 dark:text-slate-600 text-xs text-center mt-4">
         Your feedback is kept anonymous. Individual responses are never shown to professors.
       </p>
     </form>
@@ -366,15 +366,15 @@ export default function FeedbackPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="text-slate-600 text-sm">/</span>
-          <span className="text-slate-400 text-sm font-medium">Feedback</span>
+          <span className="text-slate-500 dark:text-slate-600 text-sm">/</span>
+          <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Feedback</span>
         </div>
         <Link
           href="/professors"
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />

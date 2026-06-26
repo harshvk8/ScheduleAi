@@ -26,11 +26,11 @@ export default function StudentPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
         <Logo />
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
@@ -42,8 +42,8 @@ export default function StudentPage() {
       {/* Main */}
       <main className="flex-1 flex flex-col items-center px-6 py-16">
         <div className="w-full max-w-md">
-          <h1 className="text-3xl font-bold text-white mb-2 text-center">Select your university</h1>
-          <p className="text-slate-400 text-sm text-center mb-8 leading-relaxed">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 text-center">Select your university</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm text-center mb-8 leading-relaxed">
             We'll personalise your scheduling experience based on your school's programmes and course catalog.
           </p>
 
@@ -60,7 +60,7 @@ export default function StudentPage() {
               placeholder="Search universities..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-white/10 bg-slate-900/60 text-white placeholder:text-slate-500 focus:outline-none focus:border-sky/50 focus:ring-1 focus:ring-sky/20 transition-all text-sm"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-sky/50 focus:ring-1 focus:ring-sky/20 transition-all text-sm"
             />
           </div>
 
@@ -72,14 +72,14 @@ export default function StudentPage() {
                 onClick={() => setSelected(uni.id)}
                 className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all duration-150 ${
                   selected === uni.id
-                    ? 'border-sky/50 bg-sky/10 text-white'
-                    : 'border-white/8 bg-slate-900/40 text-slate-300 hover:border-white/20 hover:bg-slate-900/70'
+                    ? 'border-sky/50 bg-sky/10 text-sky-700 dark:text-white'
+                    : 'border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:border-white/20 hover:bg-white/95 dark:bg-slate-900/70'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">{uni.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{uni.location} · {uni.domain}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{uni.location} · {uni.domain}</p>
                   </div>
                   {selected === uni.id && (
                     <div className="w-5 h-5 rounded-full bg-sky flex items-center justify-center shrink-0 ml-3">
@@ -92,7 +92,7 @@ export default function StudentPage() {
               </button>
             ))}
             {filtered.length === 0 && (
-              <div className="text-slate-500 text-sm text-center py-10">
+              <div className="text-slate-400 dark:text-slate-500 text-sm text-center py-10">
                 No universities found for "{search}"
               </div>
             )}
