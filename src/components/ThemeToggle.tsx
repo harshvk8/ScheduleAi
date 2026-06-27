@@ -35,9 +35,24 @@ export default function ThemeToggle() {
   const toggle = () => {
     if (dragging) return;
     const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem(STORAGE_KEY_THEME, next ? 'dark' : 'light');
+
+    const rect = btnRef.current?.getBoundingClientRect();
+    const x = rect ? rect.left + rect.width / 2 : pos.x + 20;
+    const y = rect ? rect.top + rect.height / 2 : pos.y + 20;
+    document.documentElement.style.setProperty('--ripple-x', `${x}px`);
+    document.documentElement.style.setProperty('--ripple-y', `${y}px`);
+
+    const applyTheme = () => {
+      setIsDark(next);
+      document.documentElement.classList.toggle('dark', next);
+      localStorage.setItem(STORAGE_KEY_THEME, next ? 'dark' : 'light');
+    };
+
+    if ('startViewTransition' in document) {
+      (document as any).startViewTransition(applyTheme);
+    } else {
+      applyTheme();
+    }
   };
 
   const onPointerDown = (e: React.PointerEvent) => {

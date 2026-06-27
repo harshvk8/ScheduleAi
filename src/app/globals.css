@@ -39,3 +39,23 @@ html.dark body {
 .animate-entrance {
   will-change: opacity, transform;
 }
+
+/* ── Ripple theme transition (View Transitions API) ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  animation: theme-ripple 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes theme-ripple {
+  from { clip-path: circle(0px at var(--ripple-x, 50%) var(--ripple-y, 50%)); }
+  to   { clip-path: circle(150vmax at var(--ripple-x, 50%) var(--ripple-y, 50%)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(root) { animation: none; }
+}
