@@ -48,7 +48,7 @@ export default function Home() {
           <div className="flex flex-wrap gap-4 mb-8">
             <Link
               href="/normal-user"
-              className="px-6 py-3 bg-white text-[#030712] font-semibold rounded-lg text-sm hover:bg-white/90 transition-colors"
+              className="px-6 py-3 bg-white text-[#030712] font-semibold rounded-lg text-sm border border-slate-200 dark:border-transparent hover:bg-white/90 shadow-sm transition-colors"
             >
               I&apos;m a normal user
             </Link>

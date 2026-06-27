@@ -12,6 +12,15 @@ function now(): T {
 
 export default function AnalogClock() {
   const [t, setT] = useState<T | null>(null);
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    setIsDark(html.classList.contains('dark'));
+    const observer = new MutationObserver(() => setIsDark(html.classList.contains('dark')));
+    observer.observe(html, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let raf: number;
@@ -57,11 +66,11 @@ export default function AnalogClock() {
     const outerR = 177;
     let innerR: number, sw: number, stroke: string;
     if (isCardinal) {
-      innerR = 160; sw = 1.2; stroke = '#cbd5e1'; // slate-300
+      innerR = 160; sw = 1.2; stroke = isDark ? '#cbd5e1' : '#64748b'; // slate-300 dark / slate-500 light
     } else if (isHour) {
-      innerR = 169; sw = 1;   stroke = '#64748b'; // slate-500
+      innerR = 169; sw = 1;   stroke = isDark ? '#64748b' : '#475569'; // slate-500 dark / slate-600 light
     } else {
-      innerR = 173; sw = 0.5; stroke = '#1e293b'; // slate-800
+      innerR = 173; sw = 0.5; stroke = isDark ? '#1e293b' : '#94a3b8'; // slate-800 dark / slate-400 light
     }
     return (
       <line
@@ -122,17 +131,17 @@ export default function AnalogClock() {
           stroke="#38bdf8" strokeWidth={1.5}
         />
 
-        {/* Hour hand — tapered 3px base → 1.5px tip, white, flat ends */}
+        {/* Hour hand — tapered 3px base → 1.5px tip, flat ends */}
         <polygon
           points={`${cx-1.5},${cy+6} ${cx+1.5},${cy+6} ${cx+0.75},${cy-hourLen} ${cx-0.75},${cy-hourLen}`}
-          fill="white"
+          fill={isDark ? 'white' : '#1e293b'}
           transform={`rotate(${hourAngle}, ${cx}, ${cy})`}
         />
 
-        {/* Minute hand — tapered 2.5px base → 1px tip, white, flat ends */}
+        {/* Minute hand — tapered 2.5px base → 1px tip, flat ends */}
         <polygon
           points={`${cx-1.25},${cy+6} ${cx+1.25},${cy+6} ${cx+0.5},${cy-minuteLen} ${cx-0.5},${cy-minuteLen}`}
-          fill="white"
+          fill={isDark ? 'white' : '#1e293b'}
           transform={`rotate(${minuteAngle}, ${cx}, ${cy})`}
         />
 
@@ -153,15 +162,15 @@ export default function AnalogClock() {
           <circle cx={cx} cy={cy + secondTail} r={2.5} fill="#38bdf8" />
         </g>
 
-        {/* Center pin — 8px outer ring slate-300, 3px inner dot black */}
-        <circle cx={cx} cy={cy} r={4}   fill="none" stroke="#cbd5e1" strokeWidth={1.5} />
-        <circle cx={cx} cy={cy} r={1.5} fill="black" />
+        {/* Center pin — 8px outer ring, 3px inner dot */}
+        <circle cx={cx} cy={cy} r={4}   fill="none" stroke={isDark ? '#cbd5e1' : '#475569'} strokeWidth={1.5} />
+        <circle cx={cx} cy={cy} r={1.5} fill={isDark ? 'black' : '#1e293b'} />
       </svg>
 
       {/* Digital readout */}
       <div className="mt-1 text-center">
         <p
-          className="text-[56px] font-bold text-white leading-none tracking-widest tabular-nums"
+          className="text-[56px] font-bold leading-none tracking-widest tabular-nums text-slate-900 dark:text-white"
           style={{ fontFamily: 'ui-monospace, monospace' }}
         >
           {hh}:{mm}:{ss}
