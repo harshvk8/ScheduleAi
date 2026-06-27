@@ -47,6 +47,11 @@ interface DayStat {
   count: number;
 }
 
+interface DayTimeStat {
+  prefer: number;
+  avoid: number;
+}
+
 interface DashStats {
   totalRequests: number;
   uniqueStudents: number;
@@ -56,6 +61,7 @@ interface DashStats {
   professorStats: ProfessorStat[];
   timeSlots: TimeSlotStat[];
   dayStats: DayStat[];
+  dayTimeMatrix: Record<string, Record<string, DayTimeStat>>;
 }
 
 // ─── Aggregation ──────────────────────────────────────────────────────────────
@@ -168,7 +174,28 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
     count: globalDay.get(label) ?? 0,
   }));
 
-  return { totalRequests, uniqueStudents, uniqueUniversities, uniqueCourses: courseStats.length, courseStats, professorStats, timeSlots, dayStats };
+  const dayTimeMatrix: Record<string, Record<string, DayTimeStat>> = {};
+  DAYS.forEach((d) => {
+    dayTimeMatrix[d] = {};
+    TIME_SLOTS.forEach((t) => { dayTimeMatrix[d][t] = { prefer: 0, avoid: 0 }; });
+  });
+  for (const req of requests) {
+    const preferDays = req.generalPreferDays ?? [];
+    const preferTimes = req.generalPreferTimes ?? [];
+    const avoidDays = req.generalAvoidDays ?? [];
+    const avoidTimes = req.generalAvoidTimes ?? [];
+    for (const day of DAYS) {
+      for (const time of TIME_SLOTS) {
+        if (avoidTimes.includes(time) || avoidDays.includes(day)) {
+          dayTimeMatrix[day][time].avoid++;
+        } else if (preferDays.includes(day) && preferTimes.includes(time)) {
+          dayTimeMatrix[day][time].prefer++;
+        }
+      }
+    }
+  }
+
+  return { totalRequests, uniqueStudents, uniqueUniversities, uniqueCourses: courseStats.length, courseStats, professorStats, timeSlots, dayStats, dayTimeMatrix };
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -332,6 +359,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="space-y-5">
                   <ProfessorDemandPanel professors={stats.professorStats} />
+                  <AvailabilityHeatmapPanel dayTimeMatrix={stats.dayTimeMatrix} />
                   <TimePreferencesPanel timeSlots={stats.timeSlots} totalRequests={stats.totalRequests} />
                   <DayPreferencesPanel days={stats.dayStats} />
                 </div>
@@ -591,6 +619,73 @@ function DayPreferencesPanel({ days }: { days: DayStat[] }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+const ADMIN_TIME_SLOTS = ['Morning', 'Afternoon', 'Evening', 'Night'] as const;
+const ADMIN_DAYS_SHORT: Record<string, string> = {
+  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed',
+  Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
+};
+const ADMIN_DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function AvailabilityHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<string, Record<string, { prefer: number; avoid: number }>> }) {
+  const allVals = ADMIN_DAYS_ORDER.flatMap((d) => ADMIN_TIME_SLOTS.map((t) => dayTimeMatrix[d]?.[t]?.prefer ?? 0));
+  const maxVal = Math.max(...allVals, 1);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
+        <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Availability Heatmap</h3>
+        <p className="text-slate-400 dark:text-slate-500 text-xs">When students prefer to have classes</p>
+      </div>
+      {/* Day header row */}
+      <div className="flex bg-slate-100 dark:bg-slate-950/60 border-b border-slate-100 dark:border-white/5">
+        <div className="w-[4.5rem] shrink-0" />
+        {ADMIN_DAYS_ORDER.map((d) => (
+          <div key={d} className="flex-1 py-2 text-center">
+            <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{ADMIN_DAYS_SHORT[d]}</p>
+          </div>
+        ))}
+      </div>
+      {/* Time rows */}
+      {ADMIN_TIME_SLOTS.map((time, idx) => (
+        <div
+          key={time}
+          className={`flex ${idx < ADMIN_TIME_SLOTS.length - 1 ? 'border-b border-slate-100 dark:border-white/[0.04]' : ''}`}
+        >
+          <div className="w-[4.5rem] shrink-0 py-2.5 flex items-center pl-4 border-r border-slate-100 dark:border-white/5">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{time}</span>
+          </div>
+          {ADMIN_DAYS_ORDER.map((day) => {
+            const cell = dayTimeMatrix[day]?.[time] ?? { prefer: 0, avoid: 0 };
+            const intensity = cell.prefer / maxVal;
+            return (
+              <div key={day} className="flex-1 p-1.5 border-r border-slate-100 dark:border-white/[0.04] last:border-r-0">
+                <div
+                  className="h-8 rounded-md transition-all duration-500"
+                  style={{ backgroundColor: `rgba(14, 165, 233, ${0.08 + intensity * 0.72})` }}
+                  title={`${day} ${time}: ${cell.prefer} prefer${cell.avoid > 0 ? `, ${cell.avoid} avoid` : ''}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {/* Legend */}
+      <div className="flex items-center gap-3 px-4 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/10">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(14,165,233,0.08)' }} />
+          <span className="text-[9px] text-slate-400 dark:text-slate-500">Low</span>
+        </div>
+        <div className="h-2 flex-1 rounded-full" style={{ background: 'linear-gradient(to right, rgba(14,165,233,0.08), rgba(14,165,233,0.8))' }} />
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(14,165,233,0.8)' }} />
+          <span className="text-[9px] text-slate-400 dark:text-slate-500">High demand</span>
+        </div>
       </div>
     </div>
   );

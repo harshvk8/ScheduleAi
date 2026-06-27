@@ -322,6 +322,112 @@ const MODALITY_BADGE: Record<Modality, string> = {
   'in-person': 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/30',
 };
 
+// ─── My Schedule tab — types, constants, helpers ──────────────────────────────
+
+type SchedEventCategory = 'work' | 'study' | 'personal' | 'class' | 'routine';
+
+interface SchedEvent {
+  id: string;
+  day: string;
+  startMinutes: number;
+  endMinutes: number;
+  title: string;
+  category: SchedEventCategory;
+  hasConflict?: boolean;
+}
+
+const SCHED_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const SCHED_DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const SCHED_GRID_START = 6;
+const SCHED_GRID_END = 23;
+const SCHED_HOUR_PX = 56;
+const SCHED_HOURS = Array.from({ length: SCHED_GRID_END - SCHED_GRID_START }, (_, i) => SCHED_GRID_START + i);
+
+const SCHED_CAT_STYLE: Record<SchedEventCategory, { bg: string; border: string; text: string }> = {
+  work:     { bg: 'bg-sky-500/25',     border: 'border-sky-400/50',     text: 'text-sky-300'     },
+  study:    { bg: 'bg-violet-500/25',  border: 'border-violet-400/50',  text: 'text-violet-300'  },
+  personal: { bg: 'bg-emerald-500/25', border: 'border-emerald-400/50', text: 'text-emerald-300' },
+  class:    { bg: 'bg-amber-500/25',   border: 'border-amber-400/50',   text: 'text-amber-300'   },
+  routine:  { bg: 'bg-slate-500/25',   border: 'border-slate-400/50',   text: 'text-slate-600 dark:text-slate-300' },
+};
+
+const SCHED_CAT_LEGEND: { label: string; cat: SchedEventCategory }[] = [
+  { label: 'Class', cat: 'class' },
+  { label: 'Study', cat: 'study' },
+  { label: 'Work', cat: 'work' },
+  { label: 'Routine', cat: 'routine' },
+  { label: 'Personal', cat: 'personal' },
+];
+
+function schedUid(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function schedFmt(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = minutes % 60;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const dh = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${dh}:${m.toString().padStart(2, '0')} ${period}`;
+}
+
+function schedDetectCategory(title: string): SchedEventCategory {
+  const t = title.toLowerCase();
+  if (/\b(work|job|shift|office|meeting)\b/.test(t)) return 'work';
+  if (/\b(study|learn|homework|java|python|coding|review|read|course)\b/.test(t)) return 'study';
+  if (/\b(class|lecture|lab|seminar|school)\b/.test(t)) return 'class';
+  if (/\b(gym|workout|run|yoga|exercise|breakfast|lunch|dinner|sleep|cook)\b/.test(t)) return 'routine';
+  return 'personal';
+}
+
+function schedMinsToTimeInput(m: number): string {
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+function detectScheduleConflicts(evs: SchedEvent[]): SchedEvent[] {
+  return evs.map((ev) => ({
+    ...ev,
+    hasConflict: evs.some(
+      (other) =>
+        other.id !== ev.id &&
+        other.day === ev.day &&
+        ev.startMinutes < other.endMinutes &&
+        ev.endMinutes > other.startMinutes
+    ),
+  }));
+}
+
+function SchedEventBlock({ event, onEdit }: { event: SchedEvent; onEdit: (ev: SchedEvent) => void }) {
+  const s = SCHED_CAT_STYLE[event.category];
+  const top = (event.startMinutes / 60 - SCHED_GRID_START) * SCHED_HOUR_PX;
+  const height = Math.max(((event.endMinutes - event.startMinutes) / 60) * SCHED_HOUR_PX - 2, 18);
+
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onEdit(event); }}
+      className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-1 overflow-hidden cursor-pointer select-none
+        ${s.bg} ${s.border}
+        ${event.hasConflict ? 'ring-1 ring-orange-400/70 hover:ring-orange-400' : 'hover:brightness-110'}`}
+      style={{ top, height }}
+      title={[
+        event.title,
+        `${schedFmt(event.startMinutes)} – ${schedFmt(event.endMinutes)}`,
+        event.hasConflict ? '⚠ Click to fix conflict' : 'Click to edit',
+      ].join(' · ')}
+    >
+      <div className="flex items-start gap-0.5 min-w-0">
+        <p className={`text-xs font-semibold leading-tight truncate flex-1 ${s.text}`}>{event.title}</p>
+        {event.hasConflict && <span className="shrink-0 text-orange-400 text-[10px] leading-none ml-0.5">⚠</span>}
+      </div>
+      {height > 32 && (
+        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate leading-tight mt-0.5">
+          {schedFmt(event.startMinutes)} – {schedFmt(event.endMinutes)}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function renderMarkdown(text: string) {
   const lines = text.split('\n');
   return lines.map((line, i) => {
@@ -382,6 +488,14 @@ export default function StudentChatbotPage() {
   const [aiEnabled, setAiEnabled] = useState(true); // flips false if API returns 503
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Right panel tab + My Schedule state ──────────────────────────────────────
+  const [activeRightTab, setActiveRightTab] = useState<'preferences' | 'schedule'>('preferences');
+  const [scheduleEvents, setScheduleEvents] = useState<SchedEvent[]>([]);
+  const [editingSchedEvent, setEditingSchedEvent] = useState<SchedEvent | null>(null);
+  const [editSchedForm, setEditSchedForm] = useState({
+    title: '', day: SCHED_DAYS[0], startTime: '09:00', endTime: '10:00',
+  });
 
   // Load student profile + pre-fetch professor data
   useEffect(() => {
@@ -481,6 +595,70 @@ export default function StudentChatbotPage() {
     [profile, availableProfs]
   );
 
+  // ── My Schedule callbacks ─────────────────────────────────────────────────────
+
+  const openSchedEdit = useCallback((ev: SchedEvent) => {
+    setEditingSchedEvent(ev);
+    setEditSchedForm({
+      title: ev.title,
+      day: ev.day,
+      startTime: schedMinsToTimeInput(ev.startMinutes),
+      endTime: schedMinsToTimeInput(ev.endMinutes),
+    });
+  }, []);
+
+  const saveSchedEdit = useCallback(() => {
+    const startParts = editSchedForm.startTime.split(':').map(Number);
+    const endParts = editSchedForm.endTime.split(':').map(Number);
+    if (startParts.length < 2 || endParts.length < 2) return;
+    const startMinutes = startParts[0] * 60 + startParts[1];
+    const endMinutes = endParts[0] * 60 + endParts[1];
+    if (isNaN(startMinutes) || isNaN(endMinutes) || endMinutes <= startMinutes) return;
+
+    const isNew = editingSchedEvent?.id === '__new__';
+    if (isNew) {
+      const newEv: SchedEvent = {
+        id: schedUid(),
+        title: editSchedForm.title.trim() || 'New Event',
+        day: editSchedForm.day,
+        startMinutes,
+        endMinutes,
+        category: schedDetectCategory(editSchedForm.title),
+      };
+      setScheduleEvents((prev) => detectScheduleConflicts([...prev, newEv]));
+    } else if (editingSchedEvent) {
+      setScheduleEvents((prev) =>
+        detectScheduleConflicts(
+          prev.map((e) =>
+            e.id === editingSchedEvent.id
+              ? { ...e, title: editSchedForm.title.trim() || e.title, day: editSchedForm.day, startMinutes, endMinutes, category: schedDetectCategory(editSchedForm.title) }
+              : e
+          )
+        )
+      );
+    }
+    setEditingSchedEvent(null);
+  }, [editingSchedEvent, editSchedForm]);
+
+  const removeSchedEvent = useCallback((id: string) => {
+    setScheduleEvents((prev) => detectScheduleConflicts(prev.filter((e) => e.id !== id)));
+    setEditingSchedEvent(null);
+  }, []);
+
+  const handleGridClick = useCallback((day: string, clickY: number) => {
+    const rawMinutes = (clickY / SCHED_HOUR_PX) * 60 + SCHED_GRID_START * 60;
+    const snapped = Math.round(rawMinutes / 15) * 15;
+    const startMinutes = Math.max(SCHED_GRID_START * 60, Math.min(snapped, (SCHED_GRID_END - 1) * 60));
+    const endMinutes = Math.min(startMinutes + 60, SCHED_GRID_END * 60);
+    setEditingSchedEvent({ id: '__new__', day, startMinutes, endMinutes, title: '', category: 'personal' });
+    setEditSchedForm({
+      title: '',
+      day,
+      startTime: schedMinsToTimeInput(startMinutes),
+      endTime: schedMinsToTimeInput(endMinutes),
+    });
+  }, []);
+
   function send() {
     const text = input.trim();
     if (!text || isDone) return;
@@ -493,7 +671,7 @@ export default function StudentChatbotPage() {
         setTyping(false);
         setMessages((prev) => [
           ...prev,
-          { role: 'bot', text: `Perfect! Your preferences are saved on the right. Hit **Submit** to send them to your university.` },
+          { role: 'bot', text: `Perfect! Your preferences have been submitted to **${profile?.universityName ?? 'your university'}**. You can now plan your week in the **My Schedule** tab on the right.` },
         ]);
         setIsDone(true);
         if (profile) {
@@ -723,19 +901,42 @@ export default function StudentChatbotPage() {
           </div>
         </div>
 
-        {/* ════════════════════════ RIGHT — Preferences ════════════════════════ */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-gray-900/40">
-          {!hasAnyPrefs && conflicts.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center px-10">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-white/8 flex items-center justify-center mb-4">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
-                </svg>
-              </div>
-              <p className="text-slate-500 dark:text-gray-500 text-sm font-medium mb-1">Your preferences will appear here</p>
-              <p className="text-slate-400 dark:text-gray-600 text-xs max-w-xs">As you chat on the left, I&apos;ll build your scheduling profile in real time.</p>
+        {/* ════════════════════════ RIGHT — Tab panel ════════════════════════ */}
+        <div className="flex-1 flex flex-col bg-slate-50 dark:bg-gray-900/40 overflow-hidden">
+
+          {/* Tab switcher */}
+          <div className="shrink-0 p-3 border-b border-slate-100 dark:border-white/5">
+            <div className="flex rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40 p-1">
+              {(['preferences', 'schedule'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveRightTab(tab)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
+                    activeRightTab === tab
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab === 'preferences' ? 'Preferences' : 'My Schedule'}
+                </button>
+              ))}
             </div>
-          ) : (
+          </div>
+
+          {activeRightTab === 'preferences' ? (
+            /* ── PREFERENCES TAB ── */
+            <div className="flex-1 overflow-y-auto">
+              {!hasAnyPrefs && conflicts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center px-10">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-white/8 flex items-center justify-center mb-4">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
+                    </svg>
+                  </div>
+                  <p className="text-slate-500 dark:text-gray-500 text-sm font-medium mb-1">Your preferences will appear here</p>
+                  <p className="text-slate-400 dark:text-gray-600 text-xs max-w-xs">As you chat on the left, I&apos;ll build your scheduling profile in real time.</p>
+                </div>
+              ) : (
             <div className="p-5 space-y-5">
 
               {/* ─ Conflict Warnings ─ */}
@@ -896,62 +1097,59 @@ export default function StudentChatbotPage() {
                 </section>
               )}
 
-              {/* ─ Schedule Suggestions ─ */}
-              {suggestions.length > 0 && (
+              {/* ─ Availability Overview (timetable style) ─ */}
+              {hasAnyPrefs && (
                 <section>
                   <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                     </svg>
-                    Best Time Slots for You
+                    Availability Overview
+                    {suggestions.length > 0 && (
+                      <span className="ml-auto text-[9px] font-normal text-violet-400/70 normal-case tracking-normal">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400/80 mr-1 mb-px" />
+                        best slots
+                      </span>
+                    )}
                   </h2>
-                  <div className="grid grid-cols-2 gap-2">
-                    {suggestions.map((s, i) => (
-                      <div key={i} className="flex flex-col px-3 py-2.5 rounded-xl bg-violet-950/30 border border-violet-800/25">
-                        <span className="text-xs font-semibold text-violet-300">{s.day.slice(0, 3)}</span>
-                        <span className={`text-[10px] font-medium mt-0.5 ${TIME_BADGE[s.time].split(' ').filter(c => c.startsWith('text-')).join(' ')}`}>{s.time}</span>
-                        <div className="flex gap-0.5 mt-1.5">
-                          {[...Array(Math.min(s.score, 5))].map((_, j) => (
-                            <div key={j} className="w-1 h-1 rounded-full bg-violet-400/60" />
-                          ))}
+                  <div className="rounded-2xl border border-slate-200 dark:border-white/8 overflow-hidden">
+                    {/* Day header row — matching normal-user timetable style */}
+                    <div className="flex border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-950/60">
+                      <div className="w-[4.5rem] shrink-0" />
+                      {DAYS_SHORT.map((d) => (
+                        <div key={d} className="flex-1 py-2.5 text-center">
+                          <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{d}</p>
                         </div>
+                      ))}
+                    </div>
+                    {/* Time slot rows */}
+                    {ALL_TIMES.map((time, idx) => (
+                      <div
+                        key={time}
+                        className={`flex bg-white dark:bg-gray-800/50 ${idx < ALL_TIMES.length - 1 ? 'border-b border-slate-100 dark:border-white/[0.04]' : ''}`}
+                      >
+                        <div className="w-[4.5rem] shrink-0 py-3 flex items-center pl-3 border-r border-slate-100 dark:border-white/5">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{time}</span>
+                        </div>
+                        {DAYS_FULL.map((day) => {
+                          const status = getCellStatus(day, time, prefs);
+                          const isBest = suggestions.some((s) => s.day === day && s.time === time);
+                          return (
+                            <div key={day} className="flex-1 p-1.5 border-r border-slate-100 dark:border-white/[0.04] last:border-r-0">
+                              <div className={`h-9 rounded-md transition-colors relative ${CELL_STYLE[status]}`}>
+                                {isBest && status !== 'avoided' && status !== 'work' && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400/80" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     ))}
-                  </div>
-                </section>
-              )}
-
-              {/* ─ Availability Grid ─ */}
-              {hasAnyPrefs && (
-                <section>
-                  <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3">Availability Overview</h2>
-                  <div className="bg-white dark:bg-gray-800/70 border border-slate-200 dark:border-white/5 rounded-2xl p-4 overflow-x-auto">
-                    <table className="w-full text-center" style={{ minWidth: 340 }}>
-                      <thead>
-                        <tr>
-                          <th className="text-[10px] text-slate-500 dark:text-gray-600 font-medium pb-2 text-left pr-2 w-20">Time</th>
-                          {DAYS_SHORT.map((d) => (
-                            <th key={d} className="text-[10px] text-slate-500 dark:text-gray-500 font-medium pb-2">{d}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ALL_TIMES.map((time) => (
-                          <tr key={time}>
-                            <td className="text-[10px] text-slate-500 dark:text-gray-500 py-1 pr-2 text-left font-medium">{time}</td>
-                            {DAYS_FULL.map((day) => {
-                              const status = getCellStatus(day, time, prefs);
-                              return (
-                                <td key={day} className="py-0.5 px-0.5">
-                                  <div className={`h-6 rounded-md transition-colors ${CELL_STYLE[status]}`} />
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-white/5">
+                    {/* Legend */}
+                    <div className="flex flex-wrap gap-3 px-4 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/10">
                       {[
                         { label: 'Available', cls: 'bg-slate-300 dark:bg-gray-700' },
                         { label: 'Preferred', cls: 'bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-400/50 dark:border-emerald-700/50' },
@@ -968,41 +1166,130 @@ export default function StudentChatbotPage() {
                 </section>
               )}
 
-              {/* ─ Structured JSON output ─ */}
-              {prefs.courses.length > 0 && (
-                <section>
-                  <details className="group">
-                    <summary className="cursor-pointer text-[11px] font-semibold text-slate-500 dark:text-gray-600 uppercase tracking-widest hover:text-slate-400 dark:hover:text-gray-400 transition-colors select-none">
-                      Extracted JSON
-                    </summary>
-                    <pre className="mt-2 bg-slate-100 dark:bg-gray-900 border border-slate-200 dark:border-white/5 rounded-xl p-3 text-[10px] text-slate-500 dark:text-gray-400 overflow-x-auto leading-relaxed">
-                      {JSON.stringify(
-                        {
-                          studentName: profile.name,
-                          university: profile.universityName,
-                          courses: prefs.courses.map((c) => ({
-                            course: c.course,
-                            ...(c.preferredProfessor ? { preferredProfessor: c.preferredProfessor } : {}),
-                            ...(c.preferredDays.length ? { preferredDays: c.preferredDays } : {}),
-                            ...(c.avoidDays.length ? { avoidDays: c.avoidDays } : {}),
-                            ...(c.preferredTimes.length ? { preferredTimes: c.preferredTimes } : {}),
-                            ...(c.avoidTimes.length ? { avoidTimes: c.avoidTimes } : {}),
-                            ...(c.modality ? { modality: c.modality } : {}),
-                          })),
-                          ...(prefs.generalPreferTimes.length ? { globalPreferTimes: prefs.generalPreferTimes } : {}),
-                          ...(prefs.generalAvoidTimes.length ? { globalAvoidTimes: prefs.generalAvoidTimes } : {}),
-                          ...(prefs.generalPreferDays.length ? { globalPreferDays: prefs.generalPreferDays } : {}),
-                          ...(prefs.generalAvoidDays.length ? { globalAvoidDays: prefs.generalAvoidDays } : {}),
-                          ...(prefs.defaultModality ? { defaultModality: prefs.defaultModality } : {}),
-                          ...(prefs.constraints.length ? { constraints: prefs.constraints } : {}),
-                        },
-                        null, 2
+            </div>
+          )}
+            </div>
+          ) : (
+            /* ── MY SCHEDULE TAB ── */
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Day headers */}
+              <div className="shrink-0 flex border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-950/60">
+                <div className="w-12 shrink-0" />
+                {SCHED_DAYS.map((day, i) => {
+                  const count = scheduleEvents.filter((e) => e.day === day).length;
+                  return (
+                    <div key={day} className="flex-1 py-2.5 text-center">
+                      <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{SCHED_DAY_SHORT[i]}</p>
+                      {count > 0 && <p className="text-[9px] text-sky-400 mt-0.5">{count}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Edit / Add event panel */}
+              {editingSchedEvent && (
+                <div className="shrink-0 px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/90 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <p className="text-xs font-semibold text-slate-900 dark:text-white flex-1">
+                      {editingSchedEvent.id === '__new__' ? 'Add Event' : 'Edit Event'}
+                    </p>
+                    {editingSchedEvent.hasConflict && (
+                      <span className="text-[10px] text-orange-400 font-medium">⚠ Conflict</span>
+                    )}
+                    <button onClick={() => setEditingSchedEvent(null)} className="text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white text-sm leading-none">✕</button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      value={editSchedForm.title}
+                      onChange={(e) => setEditSchedForm((f) => ({ ...f, title: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveSchedEdit(); }}
+                      placeholder="Event title (e.g. CS 101 Lecture)"
+                      autoFocus
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500/40"
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={editSchedForm.day}
+                        onChange={(e) => setEditSchedForm((f) => ({ ...f, day: e.target.value }))}
+                        className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none"
+                      >
+                        {SCHED_DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input type="time" value={editSchedForm.startTime}
+                        onChange={(e) => setEditSchedForm((f) => ({ ...f, startTime: e.target.value }))}
+                        className="w-20 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none"
+                      />
+                      <input type="time" value={editSchedForm.endTime}
+                        onChange={(e) => setEditSchedForm((f) => ({ ...f, endTime: e.target.value }))}
+                        className="w-20 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={saveSchedEdit} className="flex-1 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-medium hover:bg-sky-500 transition-colors">Save</button>
+                      {editingSchedEvent.id !== '__new__' && (
+                        <button onClick={() => removeSchedEvent(editingSchedEvent.id)} className="py-1.5 px-3 rounded-lg border border-red-500/30 text-red-400 text-xs hover:bg-red-500/10 transition-colors">Remove</button>
                       )}
-                    </pre>
-                  </details>
-                </section>
+                      <button onClick={() => setEditingSchedEvent(null)} className="py-1.5 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 text-xs hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
+                    </div>
+                  </div>
+                </div>
               )}
 
+              {/* Scrollable timetable grid */}
+              <div className="flex-1 overflow-auto min-h-0 relative">
+                <div className="flex min-w-[560px]" style={{ height: (SCHED_GRID_END - SCHED_GRID_START) * SCHED_HOUR_PX }}>
+                  {/* Hour labels */}
+                  <div className="w-12 shrink-0 relative select-none">
+                    {SCHED_HOURS.map((h) => (
+                      <div key={h} className="absolute right-2 text-[10px] text-slate-500 dark:text-slate-600 leading-none" style={{ top: (h - SCHED_GRID_START) * SCHED_HOUR_PX - 6 }}>
+                        {h === 12 ? '12p' : h > 12 ? `${h - 12}p` : `${h}a`}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Day columns */}
+                  {SCHED_DAYS.map((day) => (
+                    <div
+                      key={day}
+                      className="flex-1 relative border-l border-slate-100 dark:border-white/5 min-w-0 cursor-crosshair"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        handleGridClick(day, e.clientY - rect.top);
+                      }}
+                    >
+                      {SCHED_HOURS.map((h) => (
+                        <div key={h} className={`absolute left-0 right-0 border-t ${h % 6 === 0 ? 'border-slate-200 dark:border-white/10' : 'border-slate-100 dark:border-white/[0.04]'}`} style={{ top: (h - SCHED_GRID_START) * SCHED_HOUR_PX }} />
+                      ))}
+                      {scheduleEvents.filter((e) => e.day === day).map((ev) => (
+                        <SchedEventBlock key={ev.id} event={ev} onEdit={openSchedEdit} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Empty state hint overlay */}
+                {scheduleEvents.length === 0 && !editingSchedEvent && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-center px-6">
+                      <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                      </div>
+                      <p className="text-slate-400 dark:text-gray-500 text-xs">Click any time slot to add an event</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Legend */}
+              <div className="shrink-0 flex flex-wrap gap-3 px-4 py-2.5 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/10">
+                {SCHED_CAT_LEGEND.map(({ label, cat }) => (
+                  <div key={cat} className="flex items-center gap-1.5">
+                    <span className={`w-2.5 h-2.5 rounded-sm border ${SCHED_CAT_STYLE[cat].bg} ${SCHED_CAT_STYLE[cat].border}`} />
+                    <span className="text-[9px] text-slate-500 dark:text-gray-500">{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
