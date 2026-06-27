@@ -303,10 +303,10 @@ function getCellStatus(day: string, time: TimeLabel, prefs: StudentPreferences):
 }
 
 const CELL_STYLE: Record<CellStatus, string> = {
-  neutral: 'bg-gray-800/60',
-  preferred: 'bg-emerald-900/60 border border-emerald-700/50',
-  avoided: 'bg-red-950/70 border border-red-800/40',
-  work: 'bg-amber-950/70 border border-amber-800/40',
+  neutral: 'bg-slate-200/80 dark:bg-gray-800/60',
+  preferred: 'bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-400/50 dark:border-emerald-700/50',
+  avoided: 'bg-red-100 dark:bg-red-950/70 border border-red-300/60 dark:border-red-800/40',
+  work: 'bg-amber-100 dark:bg-amber-950/70 border border-amber-300/60 dark:border-amber-800/40',
 };
 
 const TIME_BADGE: Record<TimeLabel, string> = {
@@ -330,7 +330,7 @@ function renderMarkdown(text: string) {
       <span key={i}>
         {parts.map((part, j) =>
           j % 2 === 1 ? (
-            <strong key={j} className="font-semibold text-white">{part}</strong>
+            <strong key={j} className="font-semibold text-slate-900 dark:text-white">{part}</strong>
           ) : (
             <span key={j}>{part.replace(/\*(.*?)\*/g, '$1')}</span>
           )
@@ -603,7 +603,7 @@ export default function StudentChatbotPage() {
   const progressPercent = Math.round(((step + (isDone ? 1 : 0)) / STEPS.length) * 100);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-white dark:bg-gray-950 text-slate-900 dark:text-gray-100 overflow-hidden">
       {/* ── Header ── */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/5 shrink-0">
         <div className="flex items-center gap-3">
@@ -646,12 +646,12 @@ export default function StudentChatbotPage() {
               </span>
               <span className="text-xs text-slate-400 dark:text-slate-500">{progressPercent}%</span>
             </div>
-            <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-1 bg-slate-200 dark:bg-gray-800 rounded-full overflow-hidden">
               <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
             </div>
             <div className="flex gap-1 mt-2.5">
               {STEPS.map((_, i) => (
-                <div key={i} className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-sky-500' : 'bg-gray-700'}`} />
+                <div key={i} className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-sky-500' : 'bg-slate-300 dark:bg-gray-700'}`} />
               ))}
             </div>
           </div>
@@ -667,7 +667,7 @@ export default function StudentChatbotPage() {
                     </svg>
                   </div>
                 )}
-                <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-br-sm' : 'bg-gray-800 text-gray-200 rounded-bl-sm'}`}>
+                <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-br-sm' : 'bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-200 rounded-bl-sm'}`}>
                   {renderMarkdown(msg.text)}
                 </div>
               </div>
@@ -680,7 +680,7 @@ export default function StudentChatbotPage() {
                     <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
                   </svg>
                 </div>
-                <div className="bg-gray-800 px-3.5 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
+                <div className="bg-slate-100 dark:bg-gray-800 px-3.5 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                   ))}
@@ -704,7 +704,7 @@ export default function StudentChatbotPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKey}
                   placeholder='Type your answer, or "done" to finish…'
-                  className="flex-1 bg-gray-800 border border-slate-200 dark:border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/20 transition"
+                  className="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/8 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500 outline-none focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/20 transition"
                 />
                 <button
                   onClick={send}
@@ -717,23 +717,23 @@ export default function StudentChatbotPage() {
                 </button>
               </div>
             )}
-            <p className="text-[10px] text-gray-600 text-center mt-1.5">
+            <p className="text-[10px] text-slate-400 dark:text-gray-600 text-center mt-1.5">
               Try: &ldquo;CSIT 313 with Prof Brown, no morning classes, I work Mon–Fri 9 to 1&rdquo;
             </p>
           </div>
         </div>
 
         {/* ════════════════════════ RIGHT — Preferences ════════════════════════ */}
-        <div className="flex-1 overflow-y-auto bg-gray-900/40">
+        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-gray-900/40">
           {!hasAnyPrefs && conflicts.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-10">
-              <div className="w-14 h-14 rounded-2xl bg-gray-800 border border-slate-200 dark:border-white/8 flex items-center justify-center mb-4">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-white/8 flex items-center justify-center mb-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" />
                 </svg>
               </div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Your preferences will appear here</p>
-              <p className="text-gray-600 text-xs max-w-xs">As you chat on the left, I&apos;ll build your scheduling profile in real time.</p>
+              <p className="text-slate-500 dark:text-gray-500 text-sm font-medium mb-1">Your preferences will appear here</p>
+              <p className="text-slate-400 dark:text-gray-600 text-xs max-w-xs">As you chat on the left, I&apos;ll build your scheduling profile in real time.</p>
             </div>
           ) : (
             <div className="p-5 space-y-5">
@@ -769,13 +769,13 @@ export default function StudentChatbotPage() {
               {/* ─ Courses ─ */}
               {prefs.courses.length > 0 && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Courses</h2>
+                  <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3">Courses</h2>
                   <div className="space-y-2.5">
                     {prefs.courses.map((c) => (
-                      <div key={c.course} className="bg-gray-800/70 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5">
+                      <div key={c.course} className="bg-white dark:bg-gray-800/70 border border-slate-200 dark:border-white/5 rounded-2xl px-4 py-3.5">
                         <div className="flex items-start justify-between gap-3 mb-2.5">
                           <div>
-                            <span className="text-sm font-bold text-white tracking-wide">{c.course}</span>
+                            <span className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">{c.course}</span>
                             {c.preferredProfessor && (
                               <p className="text-xs text-sky-400 mt-0.5">{c.preferredProfessor}</p>
                             )}
@@ -809,7 +809,7 @@ export default function StudentChatbotPage() {
               {/* ─ Professor Recommendations ─ */}
               {profRecs.length > 0 && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                     </svg>
@@ -843,11 +843,11 @@ export default function StudentChatbotPage() {
                 prefs.defaultModality ||
                 prefs.constraints.length > 0) && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">General Preferences</h2>
-                  <div className="bg-gray-800/70 border border-slate-100 dark:border-white/5 rounded-2xl px-4 py-3.5 space-y-3">
+                  <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3">General Preferences</h2>
+                  <div className="bg-white dark:bg-gray-800/70 border border-slate-200 dark:border-white/5 rounded-2xl px-4 py-3.5 space-y-3">
                     {(prefs.generalPreferTimes.length > 0 || prefs.generalAvoidTimes.length > 0) && (
                       <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Time of Day</p>
+                        <p className="text-[10px] text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-1.5">Time of Day</p>
                         <div className="flex flex-wrap gap-1.5">
                           {prefs.generalPreferTimes.map((t) => (
                             <span key={t} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${TIME_BADGE[t as TimeLabel]}`}>✓ {t}</span>
@@ -860,7 +860,7 @@ export default function StudentChatbotPage() {
                     )}
                     {(prefs.generalPreferDays.length > 0 || prefs.generalAvoidDays.length > 0) && (
                       <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Days</p>
+                        <p className="text-[10px] text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-1.5">Days</p>
                         <div className="flex flex-wrap gap-1.5">
                           {prefs.generalPreferDays.map((d) => (
                             <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 ring-1 ring-emerald-800/40">✓ {d.slice(0, 3)}</span>
@@ -873,7 +873,7 @@ export default function StudentChatbotPage() {
                     )}
                     {prefs.defaultModality && (
                       <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Format</p>
+                        <p className="text-[10px] text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-1.5">Format</p>
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${MODALITY_BADGE[prefs.defaultModality]}`}>
                           {prefs.defaultModality}
                         </span>
@@ -881,12 +881,12 @@ export default function StudentChatbotPage() {
                     )}
                     {prefs.constraints.length > 0 && (
                       <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Constraints</p>
+                        <p className="text-[10px] text-slate-500 dark:text-gray-500 uppercase tracking-wider mb-1.5">Constraints</p>
                         <div className="space-y-1">
                           {prefs.constraints.map((c, i) => (
                             <div key={i} className="flex items-center gap-2">
                               <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.type === 'work' ? 'bg-amber-400' : 'bg-red-400'}`} />
-                              <span className="text-xs text-gray-400">{c.description}</span>
+                              <span className="text-xs text-slate-500 dark:text-gray-400">{c.description}</span>
                             </div>
                           ))}
                         </div>
@@ -899,7 +899,7 @@ export default function StudentChatbotPage() {
               {/* ─ Schedule Suggestions ─ */}
               {suggestions.length > 0 && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                     </svg>
@@ -924,21 +924,21 @@ export default function StudentChatbotPage() {
               {/* ─ Availability Grid ─ */}
               {hasAnyPrefs && (
                 <section>
-                  <h2 className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Availability Overview</h2>
-                  <div className="bg-gray-800/70 border border-slate-100 dark:border-white/5 rounded-2xl p-4 overflow-x-auto">
+                  <h2 className="text-[11px] font-semibold text-slate-500 dark:text-gray-500 uppercase tracking-widest mb-3">Availability Overview</h2>
+                  <div className="bg-white dark:bg-gray-800/70 border border-slate-200 dark:border-white/5 rounded-2xl p-4 overflow-x-auto">
                     <table className="w-full text-center" style={{ minWidth: 340 }}>
                       <thead>
                         <tr>
-                          <th className="text-[10px] text-gray-600 font-medium pb-2 text-left pr-2 w-20">Time</th>
+                          <th className="text-[10px] text-slate-500 dark:text-gray-600 font-medium pb-2 text-left pr-2 w-20">Time</th>
                           {DAYS_SHORT.map((d) => (
-                            <th key={d} className="text-[10px] text-gray-500 font-medium pb-2">{d}</th>
+                            <th key={d} className="text-[10px] text-slate-500 dark:text-gray-500 font-medium pb-2">{d}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {ALL_TIMES.map((time) => (
                           <tr key={time}>
-                            <td className="text-[10px] text-gray-500 py-1 pr-2 text-left font-medium">{time}</td>
+                            <td className="text-[10px] text-slate-500 dark:text-gray-500 py-1 pr-2 text-left font-medium">{time}</td>
                             {DAYS_FULL.map((day) => {
                               const status = getCellStatus(day, time, prefs);
                               return (
@@ -953,14 +953,14 @@ export default function StudentChatbotPage() {
                     </table>
                     <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-white/5">
                       {[
-                        { label: 'Available', cls: 'bg-gray-700' },
-                        { label: 'Preferred', cls: 'bg-emerald-900/60 border border-emerald-700/50' },
-                        { label: 'Blocked', cls: 'bg-red-950/70 border border-red-800/40' },
-                        { label: 'Work', cls: 'bg-amber-950/70 border border-amber-800/40' },
+                        { label: 'Available', cls: 'bg-slate-300 dark:bg-gray-700' },
+                        { label: 'Preferred', cls: 'bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-400/50 dark:border-emerald-700/50' },
+                        { label: 'Blocked', cls: 'bg-red-100 dark:bg-red-950/70 border border-red-300/60 dark:border-red-800/40' },
+                        { label: 'Work', cls: 'bg-amber-100 dark:bg-amber-950/70 border border-amber-300/60 dark:border-amber-800/40' },
                       ].map(({ label, cls }) => (
                         <div key={label} className="flex items-center gap-1.5">
                           <div className={`w-3 h-3 rounded-sm ${cls}`} />
-                          <span className="text-[9px] text-gray-500">{label}</span>
+                          <span className="text-[9px] text-slate-500 dark:text-gray-500">{label}</span>
                         </div>
                       ))}
                     </div>
@@ -972,10 +972,10 @@ export default function StudentChatbotPage() {
               {prefs.courses.length > 0 && (
                 <section>
                   <details className="group">
-                    <summary className="cursor-pointer text-[11px] font-semibold text-gray-600 uppercase tracking-widest hover:text-gray-400 transition-colors select-none">
+                    <summary className="cursor-pointer text-[11px] font-semibold text-slate-500 dark:text-gray-600 uppercase tracking-widest hover:text-slate-400 dark:hover:text-gray-400 transition-colors select-none">
                       Extracted JSON
                     </summary>
-                    <pre className="mt-2 bg-gray-900 border border-slate-100 dark:border-white/5 rounded-xl p-3 text-[10px] text-gray-400 overflow-x-auto leading-relaxed">
+                    <pre className="mt-2 bg-slate-100 dark:bg-gray-900 border border-slate-200 dark:border-white/5 rounded-xl p-3 text-[10px] text-slate-500 dark:text-gray-400 overflow-x-auto leading-relaxed">
                       {JSON.stringify(
                         {
                           studentName: profile.name,

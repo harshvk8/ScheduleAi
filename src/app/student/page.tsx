@@ -73,7 +73,7 @@ export default function StudentPage() {
                 className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all duration-150 ${
                   selected === uni.id
                     ? 'border-sky/50 bg-sky/10 text-sky-700 dark:text-white'
-                    : 'border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:border-white/20 hover:bg-white/95 dark:bg-slate-900/70'
+                    : 'border-slate-200 dark:border-white/8 bg-white dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-slate-900/70'
                 }`}
               >
                 <div className="flex items-center justify-between">

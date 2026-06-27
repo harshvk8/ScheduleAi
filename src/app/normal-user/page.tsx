@@ -473,9 +473,9 @@ function NormalUserPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-midnight">
+    <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-midnight">
       {/* Header */}
-      <header className="shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-slate-100 dark:border-white/5 bg-midnight/90 backdrop-blur-sm">
+      <header className="shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-slate-100 dark:border-white/5 bg-white/90 dark:bg-midnight/90 backdrop-blur-sm">
         <Logo />
         <div className="flex items-center gap-4">
           <div className="hidden lg:flex items-center gap-3">
@@ -511,7 +511,7 @@ function NormalUserPage() {
         {/* ══ TIMETABLE ══ */}
         <div className="flex-1 flex flex-col min-h-0 border-r border-slate-100 dark:border-white/5">
           {/* Day header */}
-          <div className="shrink-0 flex border-b border-slate-100 dark:border-white/5 bg-slate-950/60">
+          <div className="shrink-0 flex border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-950/60">
             <div className="w-12 shrink-0" />
             {DAYS.map((day, i) => {
               const count = events.filter((e) => e.day === day).length;
@@ -526,9 +526,9 @@ function NormalUserPage() {
 
           {/* Edit panel */}
           {editingEvent && (
-            <div className="shrink-0 px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-slate-900/90 backdrop-blur-sm">
+            <div className="shrink-0 px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/90 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-2.5">
-                <p className="text-xs font-semibold text-white flex-1">Edit Event</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white flex-1">Edit Event</p>
                 {editingEvent.hasConflict && (
                   <span className="text-[10px] text-orange-400 font-medium">⚠ Conflict — adjust time or day</span>
                 )}
@@ -539,13 +539,13 @@ function NormalUserPage() {
                   value={editForm.title}
                   onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
                   placeholder="Event title"
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-white focus:outline-none focus:border-sky/40"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky/40"
                 />
                 <div className="flex gap-2">
                   <select
                     value={editForm.day}
                     onChange={(e) => setEditForm((f) => ({ ...f, day: e.target.value }))}
-                    className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-white focus:outline-none focus:border-sky/40"
+                    className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky/40"
                   >
                     {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
@@ -553,13 +553,13 @@ function NormalUserPage() {
                     type="time"
                     value={editForm.startTime}
                     onChange={(e) => setEditForm((f) => ({ ...f, startTime: e.target.value }))}
-                    className="w-24 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-white focus:outline-none focus:border-sky/40"
+                    className="w-24 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky/40"
                   />
                   <input
                     type="time"
                     value={editForm.endTime}
                     onChange={(e) => setEditForm((f) => ({ ...f, endTime: e.target.value }))}
-                    className="w-24 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-white focus:outline-none focus:border-sky/40"
+                    className="w-24 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky/40"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -584,7 +584,7 @@ function NormalUserPage() {
               {DAYS.map((day) => (
                 <div key={day} className="flex-1 relative border-l border-slate-100 dark:border-white/5 min-w-0">
                   {HOURS.map((h) => (
-                    <div key={h} className={`absolute left-0 right-0 border-t ${h % 6 === 0 ? 'border-slate-200 dark:border-white/10' : 'border-white/[0.04]'}`} style={{ top: (h - GRID_START) * HOUR_PX }} />
+                    <div key={h} className={`absolute left-0 right-0 border-t ${h % 6 === 0 ? 'border-slate-200 dark:border-white/10' : 'border-slate-100 dark:border-white/[0.04]'}`} style={{ top: (h - GRID_START) * HOUR_PX }} />
                   ))}
                   {events.filter((e) => e.day === day).map((ev) => (
                     <EventBlock key={ev.id} event={ev} onEdit={openEdit} />
@@ -596,11 +596,11 @@ function NormalUserPage() {
         </div>
 
         {/* ══ CHAT PANEL ══ */}
-        <div className="w-72 xl:w-80 shrink-0 flex flex-col min-h-0 bg-slate-950/40">
+        <div className="w-72 xl:w-80 shrink-0 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950/40">
           {/* Chat header */}
           <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/5">
             <div>
-              <h2 className="text-sm font-semibold text-white">AI Schedule Assistant</h2>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">AI Schedule Assistant</h2>
             </div>
             {internalCount > 0 && (
               <button onClick={clearAll} className="text-[11px] text-slate-500 dark:text-slate-600 hover:text-red-400 transition-colors">Clear all</button>
@@ -608,7 +608,7 @@ function NormalUserPage() {
           </div>
 
           {/* Google Calendar sync */}
-          <div className="shrink-0 px-3 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-950/30">
+          <div className="shrink-0 px-3 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-950/30">
             {!googleToken ? (
               <button
                 onClick={() => googleLogin()}
@@ -665,7 +665,7 @@ function NormalUserPage() {
           </div>
 
           {/* Apple Calendar / iCal export */}
-          <div className="shrink-0 px-3 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-950/30 space-y-2">
+          <div className="shrink-0 px-3 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-950/30 space-y-2">
             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide">Export Schedule</p>
             <button
               onClick={handleSubscribeApple}
@@ -706,7 +706,7 @@ function NormalUserPage() {
                   className={`max-w-[88%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
                     msg.role === 'user'
                       ? 'bg-sky text-white rounded-tr-sm'
-                      : 'bg-slate-800/70 text-slate-200 rounded-tl-sm'
+                      : 'bg-slate-200 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 rounded-tl-sm'
                   }`}
                 >
                   {msg.text}
@@ -716,7 +716,7 @@ function NormalUserPage() {
 
             {typing && (
               <div className="flex justify-start">
-                <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm bg-slate-800/70">
+                <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm bg-slate-200 dark:bg-slate-800/70">
                   <div className="flex gap-1 items-center">
                     {[0, 150, 300].map((delay) => (
                       <span key={delay} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${delay}ms` }} />
@@ -775,7 +775,7 @@ function NormalUserPage() {
                 onKeyDown={onKeyDown}
                 placeholder="e.g. I work Monday 9 AM to 5 PM…"
                 rows={2}
-                className="flex-1 resize-none px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/70 text-sm text-white placeholder:text-slate-500 dark:text-slate-600 focus:outline-none focus:border-sky/40 focus:ring-1 focus:ring-sky/20 transition-all leading-snug"
+                className="flex-1 resize-none px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/70 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-sky/40 focus:ring-1 focus:ring-sky/20 transition-all leading-snug"
               />
               <button
                 onClick={send}

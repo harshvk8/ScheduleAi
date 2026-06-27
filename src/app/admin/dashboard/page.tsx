@@ -236,9 +236,9 @@ export default function AdminDashboard() {
   if (!user || profile?.role !== 'admin') return null;
 
   return (
-    <div className="min-h-screen bg-midnight text-white">
+    <div className="min-h-screen bg-white dark:bg-midnight text-slate-900 dark:text-white">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-slate-100 dark:border-white/5 bg-midnight/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-slate-100 dark:border-white/5 bg-white/95 dark:bg-midnight/95 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <Logo />
           <span className="text-slate-500 dark:text-slate-600 text-sm">/</span>
@@ -275,7 +275,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Tab bar */}
-      <div className="border-b border-slate-100 dark:border-white/5 bg-midnight/60">
+      <div className="border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-midnight/60">
         <div className="px-8 max-w-7xl mx-auto flex gap-1 pt-2">
           {(['analytics', 'bugs'] as const).map((tab) => (
             <button
@@ -283,7 +283,7 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all ${
                 activeTab === tab
-                  ? 'text-white border-b-2 border-sky'
+                  ? 'text-slate-900 dark:text-white border-b-2 border-sky'
                   : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300'
               }`}
             >
@@ -400,7 +400,7 @@ function StatCard({ label, value, color }: { label: string; value: number; color
       <div className={`w-9 h-9 rounded-xl border flex items-center justify-center mb-4 ${styles[color]}`}>
         {icons[color]}
       </div>
-      <div className="text-3xl font-bold text-white mb-1">{value.toLocaleString()}</div>
+      <div className="text-3xl font-bold text-slate-900 dark:text-white mb-1">{value.toLocaleString()}</div>
       <div className="text-slate-500 dark:text-slate-400 text-sm">{label}</div>
     </div>
   );
@@ -410,7 +410,7 @@ function CourseDemandTable({ courses, totalRequests }: { courses: CourseStats[];
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5">
-        <h2 className="text-white font-semibold">Course Demand</h2>
+        <h2 className="text-slate-900 dark:text-white font-semibold">Course Demand</h2>
         <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
           Ranked by student interest · {courses.length} {courses.length === 1 ? 'course' : 'courses'}
         </p>
@@ -433,7 +433,7 @@ function CourseDemandTable({ courses, totalRequests }: { courses: CourseStats[];
                   <span className="font-mono font-bold text-sky">{course.name}</span>
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <span className="text-white font-semibold">{course.count}</span>
+                  <span className="text-slate-900 dark:text-white font-semibold">{course.count}</span>
                   <span className="text-slate-500 dark:text-slate-600 text-xs ml-1.5">
                     ({Math.round((course.count / totalRequests) * 100)}%)
                   </span>
@@ -488,7 +488,7 @@ function ProfessorDemandPanel({ professors }: { professors: ProfessorStat[] }) {
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 p-5">
-      <h3 className="text-white font-semibold mb-0.5">Professor Demand</h3>
+      <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Professor Demand</h3>
       <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Most requested by students</p>
       {professors.length === 0 ? (
         <p className="text-slate-500 dark:text-slate-600 text-sm">No professor preferences recorded yet</p>
@@ -498,7 +498,7 @@ function ProfessorDemandPanel({ professors }: { professors: ProfessorStat[] }) {
             <div key={prof.name}>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-slate-600 dark:text-slate-300 text-xs truncate max-w-[160px]">{prof.name}</span>
-                <span className="text-white font-semibold text-sm ml-2 shrink-0">{prof.count}</span>
+                <span className="text-slate-900 dark:text-white font-semibold text-sm ml-2 shrink-0">{prof.count}</span>
               </div>
               <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <div
@@ -522,7 +522,7 @@ function TimePreferencesPanel({ timeSlots, totalRequests }: { timeSlots: TimeSlo
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 p-5">
-      <h3 className="text-white font-semibold mb-0.5">Time Preferences</h3>
+      <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Time Preferences</h3>
       <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">When students want classes</p>
       <div className="space-y-4">
         {timeSlots.map((slot) => (
@@ -573,7 +573,7 @@ function DayPreferencesPanel({ days }: { days: DayStat[] }) {
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 p-5">
-      <h3 className="text-white font-semibold mb-0.5">Day Preferences</h3>
+      <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Day Preferences</h3>
       <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Most requested days</p>
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => {
@@ -636,7 +636,7 @@ function ProfessorFeedbackPanel({ feedback }: { feedback: ProfessorFeedbackDoc[]
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
         <div>
-          <h2 className="text-white font-semibold">Professor Feedback Analytics</h2>
+          <h2 className="text-slate-900 dark:text-white font-semibold">Professor Feedback Analytics</h2>
           <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
             Aggregated student ratings · {feedback.length} {feedback.length === 1 ? 'review' : 'reviews'} · {summaries.length} {summaries.length === 1 ? 'professor' : 'professors'}
           </p>
@@ -665,7 +665,7 @@ function ProfessorFeedbackPanel({ feedback }: { feedback: ProfessorFeedbackDoc[]
             {summaries.map((p) => (
               <tr key={p.name} className="hover:bg-white/[0.02] transition-colors">
                 <td className="px-6 py-3.5">
-                  <span className="text-white font-medium text-sm">{p.name}</span>
+                  <span className="text-slate-900 dark:text-white font-medium text-sm">{p.name}</span>
                 </td>
                 <td className="px-4 py-3.5">
                   <div className="flex flex-wrap gap-1">
@@ -682,7 +682,7 @@ function ProfessorFeedbackPanel({ feedback }: { feedback: ProfessorFeedbackDoc[]
                 </td>
                 <td className="px-4 py-3.5 text-center">
                   {p.avgRating != null ? (
-                    <span className="text-white font-semibold">{p.avgRating.toFixed(1)}<span className="text-slate-500 dark:text-slate-600 font-normal text-xs">/5</span></span>
+                    <span className="text-slate-900 dark:text-white font-semibold">{p.avgRating.toFixed(1)}<span className="text-slate-500 dark:text-slate-600 font-normal text-xs">/5</span></span>
                   ) : <span className="text-slate-500 dark:text-slate-600 text-xs">—</span>}
                 </td>
                 <td className="px-4 py-3.5 text-center">
@@ -721,7 +721,7 @@ function EmptyState() {
           <line x1="6" y1="20" x2="6" y2="14" />
         </svg>
       </div>
-      <h3 className="text-white font-semibold text-xl mb-2">No requests yet</h3>
+      <h3 className="text-slate-900 dark:text-white font-semibold text-xl mb-2">No requests yet</h3>
       <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed">
         Student schedule requests will appear here once students start submitting their course preferences through the chatbot.
       </p>
@@ -770,7 +770,7 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 filter === f
-                  ? 'bg-white/10 text-white'
+                  ? 'bg-sky/10 text-sky dark:bg-white/10 dark:text-white'
                   : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300'
               }`}
             >
@@ -794,7 +794,7 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
             </svg>
           </div>
-          <h3 className="text-white font-semibold mb-2">No bug reports</h3>
+          <h3 className="text-slate-900 dark:text-white font-semibold mb-2">No bug reports</h3>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
             {filter === 'all' ? 'No errors have been reported yet.' : `No ${filter}-severity reports.`}
           </p>
@@ -802,7 +802,7 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
       ) : (
         <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5">
-            <h2 className="text-white font-semibold">Bug Reports</h2>
+            <h2 className="text-slate-900 dark:text-white font-semibold">Bug Reports</h2>
             <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
               AI-analyzed crash reports from user sessions · {filtered.length} {filtered.length === 1 ? 'report' : 'reports'}
             </p>
@@ -887,7 +887,7 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-midnight flex items-center justify-center">
+    <div className="min-h-screen bg-white dark:bg-midnight flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 rounded-2xl bg-sky/10 border border-sky/20 flex items-center justify-center mx-auto mb-4 animate-pulse">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
