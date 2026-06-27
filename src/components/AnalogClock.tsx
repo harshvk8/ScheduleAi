@@ -96,8 +96,8 @@ export default function AnalogClock() {
   return (
     <div className="flex flex-col items-center select-none">
       <svg width="360" height="360" viewBox="0 0 400 400">
-        {/* Outer ring: slate-700, 1px */}
-        <circle cx={cx} cy={cy} r={192} fill="none" stroke="#334155" strokeWidth={1} />
+        {/* Outer ring: slate-700, 1px — ambient breathe */}
+        <circle cx={cx} cy={cy} r={192} fill="none" stroke="#334155" strokeWidth={1} className="animate-breathe" />
         {/* Inner ring: slate-800, 1px — 12px gap from outer */}
         <circle cx={cx} cy={cy} r={180} fill="none" stroke="#1e293b" strokeWidth={1} />
 
