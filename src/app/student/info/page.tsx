@@ -216,7 +216,7 @@ function StudentInfoForm() {
       <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
         <Logo />
         <button
-          onClick={() => router.push('/student')}
+          onClick={() => router.back()}
           className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
