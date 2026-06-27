@@ -819,7 +819,7 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
                       {report.severity}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-slate-200 text-sm leading-snug line-clamp-2">{report.aiSummary}</p>
+                      <p className="text-slate-700 dark:text-slate-200 text-sm leading-snug line-clamp-2">{report.aiSummary}</p>
                       <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 dark:text-slate-600">
                         <span>{new Date(report.timestamp).toLocaleString()}</span>
                         <span>·</span>

@@ -35,7 +35,7 @@ function friendlyError(err: AuthError): string {
 }
 
 const inputCls =
-  'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors';
+  'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ export default function AdminPage() {
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1">Admin portal</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Admin portal</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">University administrators only</p>
         </div>
 
@@ -148,19 +148,19 @@ export default function AdminPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-white font-semibold text-sm">Sign in</h2>
-                <p className="text-slate-400 dark:text-slate-500 text-xs">Access your dashboard</p>
+                <h2 className="text-slate-900 dark:text-white font-semibold text-sm">Sign in</h2>
+                <p className="text-slate-500 dark:text-slate-500 text-xs">Access your dashboard</p>
               </div>
             </div>
 
             <form onSubmit={handleLogin} className="flex flex-col flex-1 gap-3">
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Email</label>
+                <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Email</label>
                 <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="admin@university.edu" required className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Password</label>
+                <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Password</label>
                 <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
                   placeholder="••••••••" required className={inputCls} />
               </div>
@@ -184,35 +184,35 @@ export default function AdminPage() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-white font-semibold text-sm">Create account</h2>
-                <p className="text-slate-400 dark:text-slate-500 text-xs">Register as university admin</p>
+                <h2 className="text-slate-900 dark:text-white font-semibold text-sm">Create account</h2>
+                <p className="text-slate-500 dark:text-slate-500 text-xs">Register as university admin</p>
               </div>
             </div>
 
             <form onSubmit={handleRegister} className="flex flex-col flex-1 gap-3">
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Full name</label>
+                <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Full name</label>
                 <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)}
                   placeholder="Dr. Jane Smith" required className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">University</label>
+                <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">University</label>
                 <input type="text" value={regUniversity} onChange={(e) => setRegUniversity(e.target.value)}
                   placeholder="Montclair State University" required className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Email</label>
+                <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Email</label>
                 <input type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)}
                   placeholder="admin@university.edu" required className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Password</label>
+                  <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Password</label>
                   <input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)}
                     placeholder="••••••" required className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Confirm</label>
+                  <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Confirm</label>
                   <input type="password" value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)}
                     placeholder="••••••" required className={inputCls} />
                 </div>

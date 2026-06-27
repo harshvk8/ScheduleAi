@@ -201,7 +201,7 @@ export default function ProfessorsPage() {
       </header>
 
       {/* Search hero */}
-      <div className="px-8 py-12 border-b border-slate-100 dark:border-white/5 bg-slate-900/20">
+      <div className="px-8 py-12 border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-900/20">
         <div className="max-w-2xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 rounded-full border border-sky/30 bg-sky/10 text-sky text-xs font-medium">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -209,7 +209,7 @@ export default function ProfessorsPage() {
             </svg>
             Professor Search
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Find Professors</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Find Professors</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
             Search professors at your university and view student ratings &amp; demand
           </p>
@@ -228,7 +228,7 @@ export default function ProfessorsPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search professor name…"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-400 dark:text-slate-500 text-sm focus:outline-none focus:border-sky/40 transition-colors"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:outline-none focus:border-sky/40 transition-colors"
               />
             </div>
 
@@ -255,7 +255,7 @@ export default function ProfessorsPage() {
           <>
             {/* Count label */}
             {!loading && (
-              <p className="text-slate-400 dark:text-slate-500 text-sm mb-6">
+              <p className="text-slate-600 dark:text-slate-500 text-sm mb-6">
                 {filtered.length === 0
                   ? 'No professors found'
                   : `${filtered.length} professor${filtered.length === 1 ? '' : 's'} found`}
@@ -277,7 +277,7 @@ export default function ProfessorsPage() {
 
             {/* Rate a professor CTA */}
             <div className="mt-12 text-center px-6 py-6 rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/30 max-w-lg mx-auto">
-              <p className="text-white text-sm font-semibold mb-1">Taken a class recently?</p>
+              <p className="text-slate-900 dark:text-white text-sm font-semibold mb-1">Taken a class recently?</p>
               <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">
                 Share your experience and help other students choose the right professor.
               </p>
@@ -316,7 +316,7 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
           <span className="text-sky font-bold text-sm">{initials}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-white font-semibold text-base leading-tight truncate">{p.name}</h3>
+          <h3 className="text-slate-900 dark:text-white font-semibold text-base leading-tight truncate">{p.name}</h3>
           {p.universityName && (
             <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 truncate">{p.universityName}</p>
           )}
@@ -348,13 +348,13 @@ function ProfessorCard({ professor: p }: { professor: ProfessorProfile }) {
       )}
 
       {/* Divider */}
-      <div className="h-px bg-white/5 mb-4" />
+      <div className="h-px bg-slate-100 dark:bg-white/5 mb-4" />
 
       {/* Rating section */}
       {p.feedbackCount > 0 && p.avgRating != null ? (
         <div className="mb-4">
           <div className="flex items-center gap-3 mb-3">
-            <span className="text-3xl font-bold text-white">{p.avgRating.toFixed(1)}</span>
+            <span className="text-3xl font-bold text-slate-900 dark:text-white">{p.avgRating.toFixed(1)}</span>
             <div>
               <StarRow rating={p.avgRating} />
               <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
@@ -477,14 +477,14 @@ function EmptyState({ hasQuery }: { hasQuery: boolean }) {
 
       {hasQuery ? (
         <>
-          <h3 className="text-white font-semibold text-xl mb-2">No professors found</h3>
+          <h3 className="text-slate-900 dark:text-white font-semibold text-xl mb-2">No professors found</h3>
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed">
             No professors match your search. Try a different name or clear the filter.
           </p>
         </>
       ) : (
         <>
-          <h3 className="text-white font-semibold text-xl mb-2">No professors yet</h3>
+          <h3 className="text-slate-900 dark:text-white font-semibold text-xl mb-2">No professors yet</h3>
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed">
             Professors appear here when students mention them in the scheduling chatbot. Be the first to submit your preferences.
           </p>
@@ -519,7 +519,7 @@ function LoadingState() {
             <div className="h-5 bg-white/5 rounded w-16" />
             <div className="h-5 bg-white/5 rounded w-20" />
           </div>
-          <div className="h-px bg-white/5 mb-4" />
+          <div className="h-px bg-slate-100 dark:bg-white/5 mb-4" />
           <div className="h-10 bg-white/5 rounded-xl" />
         </div>
       ))}

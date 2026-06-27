@@ -74,7 +74,7 @@ function RatingRow({
   return (
     <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-8 py-4 border-b border-slate-100 dark:border-white/5 last:border-0">
       <div className="sm:w-52 shrink-0">
-        <p className="text-white text-sm font-medium">{label}</p>
+        <p className="text-slate-900 dark:text-white text-sm font-medium">{label}</p>
         <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">{description}</p>
       </div>
       <StarPicker value={value} onChange={onChange} low={low} high={high} />
@@ -159,9 +159,9 @@ function FeedbackForm() {
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
-        <h2 className="text-white text-2xl font-bold mb-2">Thanks for your feedback!</h2>
+        <h2 className="text-slate-900 dark:text-white text-2xl font-bold mb-2">Thanks for your feedback!</h2>
         <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-          Your review of <span className="text-white font-medium">{professorName}</span> has been saved and will help other students make better decisions.
+          Your review of <span className="text-slate-900 dark:text-white font-medium">{professorName}</span> has been saved and will help other students make better decisions.
         </p>
         <div className="flex gap-3">
           <button
@@ -188,14 +188,14 @@ function FeedbackForm() {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold text-white mb-1">Rate a Professor</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Rate a Professor</h1>
       <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
         Your feedback is anonymous and helps students choose courses and professors that fit their learning style.
       </p>
 
       {/* Section: Who are you reviewing? */}
       <section className="mb-8">
-        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Who are you reviewing?</h2>
+        <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-500 uppercase tracking-wider mb-4">Who are you reviewing?</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-slate-600 dark:text-slate-300 text-sm mb-1.5">Professor name <span className="text-red-400">*</span></label>
@@ -204,7 +204,7 @@ function FeedbackForm() {
               value={professorName}
               onChange={(e) => setProfessorName(e.target.value)}
               placeholder="e.g. Professor Smith"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
             />
           </div>
           <div>
@@ -214,7 +214,7 @@ function FeedbackForm() {
               value={courseCode}
               onChange={(e) => setCourseCode(e.target.value)}
               placeholder="e.g. CSIT 313"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors"
             />
           </div>
         </div>
@@ -235,7 +235,7 @@ function FeedbackForm() {
 
       {/* Section: Ratings */}
       <section className="mb-8 p-6 rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40">
-        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Ratings</h2>
+        <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-500 uppercase tracking-wider mb-4">Ratings</h2>
 
         <RatingRow
           label="Overall rating"
@@ -281,7 +281,7 @@ function FeedbackForm() {
 
       {/* Would take again */}
       <section className="mb-8">
-        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Would you take this professor again?</h2>
+        <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-500 uppercase tracking-wider mb-4">Would you take this professor again?</h2>
         <div className="flex gap-3">
           <button
             type="button"
@@ -316,14 +316,14 @@ function FeedbackForm() {
 
       {/* Written feedback */}
       <section className="mb-8">
-        <h2 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Written feedback <span className="text-slate-700 normal-case font-normal">(optional)</span></h2>
+        <h2 className="text-xs font-semibold text-slate-600 dark:text-slate-500 uppercase tracking-wider mb-4">Written feedback <span className="text-slate-700 normal-case font-normal">(optional)</span></h2>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Share your experience — what was the class like? What did you learn? Any tips for future students?"
           rows={5}
           maxLength={800}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-white placeholder:text-slate-500 dark:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors resize-none leading-relaxed"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 text-sm focus:outline-none focus:border-sky/40 transition-colors resize-none leading-relaxed"
         />
         <p className="text-slate-500 dark:text-slate-600 text-xs mt-1.5 text-right">{comment.length}/800</p>
       </section>
