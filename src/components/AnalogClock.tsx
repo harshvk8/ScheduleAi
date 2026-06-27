@@ -82,13 +82,16 @@ export default function AnalogClock() {
     );
   });
 
-  // Cardinal labels (00, 15, 30, 45) inside the face near tick ends
-  const labels = [
-    { v: '00', x: cx,       y: cy - 150 },
-    { v: '15', x: cx + 150, y: cy       },
-    { v: '30', x: cx,       y: cy + 150 },
-    { v: '45', x: cx - 150, y: cy       },
-  ];
+  // Hour number labels (12, 1, 2, … 11) just inside the tick marks
+  const hourLabels = Array.from({ length: 12 }, (_, i) => {
+    const label = i === 0 ? 12 : i;
+    const rad = (i * 30 * Math.PI) / 180;
+    return {
+      v: String(label),
+      x: cx + 145 * Math.sin(rad),
+      y: cy - 145 * Math.cos(rad),
+    };
+  });
 
   return (
     <div className="flex flex-col items-center select-none">
@@ -110,15 +113,15 @@ export default function AnalogClock() {
         {/* Tick marks */}
         {ticks}
 
-        {/* Cardinal labels: 9px Geist Mono, slate-500, ~13% opacity */}
-        {labels.map(({ v, x, y }) => (
+        {/* Hour numbers: 12 1 2 … 11 */}
+        {hourLabels.map(({ v, x, y }) => (
           <text
             key={v} x={x} y={y}
             textAnchor="middle" dominantBaseline="middle"
-            fill="#64748b" fontSize={9}
-            fontFamily="'Geist Mono', 'JetBrains Mono', ui-monospace, monospace"
-            letterSpacing="0.08em"
-            opacity={0.13}
+            fill={isDark ? 'white' : 'black'}
+            fontSize={11}
+            fontFamily="ui-sans-serif, system-ui, sans-serif"
+            fontWeight="400"
           >
             {v}
           </text>
