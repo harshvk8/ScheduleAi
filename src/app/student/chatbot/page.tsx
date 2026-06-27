@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import { saveScheduleRequest, getAllProfessorFeedback, getAllScheduleRequests } from '@/lib/db';
 import type { ChatApiResponse } from '@/app/api/chat/route';
+import type { CalendarChatResponse } from '@/app/api/calendar-chat/route';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -489,6 +490,20 @@ export default function StudentChatbotPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // ── Schedule chat (calendar assistant) state ──────────────────────────────────
+  const [schedChatMessages, setSchedChatMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
+    {
+      role: 'assistant',
+      text: "Hi! I'm your AI schedule assistant. Tell me what to add — for example:\n\n\"I work Monday to Friday 9 AM to 5 PM.\"\n\"Add gym Tuesday and Thursday at 7 AM for 1 hour.\"\n\"What's on my schedule this week?\"\n\nI'll update your timetable and suggest what's next.",
+    },
+  ]);
+  const [schedChatInput, setSchedChatInput] = useState('');
+  const [schedTyping, setSchedTyping] = useState(false);
+  const [schedSuggestions, setSchedSuggestions] = useState<string[]>([]);
+  const [schedApiHistory, setSchedApiHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const schedChatEndRef = useRef<HTMLDivElement>(null);
+  const schedInputRef = useRef<HTMLTextAreaElement>(null);
+
   // ── Right panel tab + My Schedule state ──────────────────────────────────────
   const [activeRightTab, setActiveRightTab] = useState<'preferences' | 'schedule'>('preferences');
   const [scheduleEvents, setScheduleEvents] = useState<SchedEvent[]>([]);
@@ -553,6 +568,10 @@ export default function StudentChatbotPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
+
+  useEffect(() => {
+    schedChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [schedChatMessages, schedTyping]);
 
   // Recompute schedule suggestions whenever prefs change
   useEffect(() => {
@@ -658,6 +677,59 @@ export default function StudentChatbotPage() {
       endTime: schedMinsToTimeInput(endMinutes),
     });
   }, []);
+
+  const sendScheduleMessage = useCallback(async (text: string) => {
+    if (schedTyping || !text.trim()) return;
+    const userMsg = { role: 'user' as const, text };
+    setSchedChatMessages((prev) => [...prev, userMsg]);
+    setSchedTyping(true);
+    setSchedSuggestions([]);
+
+    try {
+      const history = [...schedApiHistory, { role: 'user' as const, content: text }];
+      const res = await fetch('/api/calendar-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: history,
+          currentEvents: scheduleEvents.map((e) => ({
+            id: e.id, day: e.day, startMinutes: e.startMinutes,
+            endMinutes: e.endMinutes, title: e.title, category: e.category,
+          })),
+          googleConnected: false,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`API_${res.status}`);
+      const data: CalendarChatResponse = await res.json();
+
+      setScheduleEvents((prev) => {
+        let updated = [...prev];
+        updated = updated.filter((e) => !data.deletedIds.includes(e.id));
+        for (const edit of data.editedEvents) {
+          updated = updated.map((e) => (e.id === edit.id ? { ...e, ...edit.changes } : e));
+        }
+        updated = [...updated, ...data.addedEvents.map((e) => ({
+          ...e,
+          hasConflict: false,
+        }))];
+        return detectScheduleConflicts(updated);
+      });
+
+      const assistantMsg = { role: 'assistant' as const, text: data.reply };
+      setSchedChatMessages((prev) => [...prev, assistantMsg]);
+      setSchedApiHistory((h) => [...h, { role: 'user', content: text }, { role: 'assistant', content: data.reply }]);
+      setSchedSuggestions(data.suggestions ?? []);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const errText = msg.includes('API_429')
+        ? "You're sending messages too quickly — give it a moment and try again."
+        : 'Assistant is temporarily unavailable. Please try again in a moment.';
+      setSchedChatMessages((prev) => [...prev, { role: 'assistant', text: errText }]);
+    } finally {
+      setSchedTyping(false);
+    }
+  }, [schedTyping, schedApiHistory, scheduleEvents]);
 
   function send() {
     const text = input.trim();
@@ -816,89 +888,214 @@ export default function StudentChatbotPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* ════════════════════════ LEFT — Chat ════════════════════════ */}
         <div className="w-[42%] flex flex-col border-r border-slate-100 dark:border-white/5">
-          {/* Progress */}
-          <div className="px-5 pt-4 pb-3 border-b border-slate-100 dark:border-white/5 shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400 dark:text-slate-500">
-                {isDone ? 'Complete' : `Step ${Math.min(step + 1, STEPS.length)} of ${STEPS.length}`}
-              </span>
-              <span className="text-xs text-slate-400 dark:text-slate-500">{progressPercent}%</span>
-            </div>
-            <div className="h-1 bg-slate-200 dark:bg-gray-800 rounded-full overflow-hidden">
-              <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
-            </div>
-            <div className="flex gap-1 mt-2.5">
-              {STEPS.map((_, i) => (
-                <div key={i} className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-sky-500' : 'bg-slate-300 dark:bg-gray-700'}`} />
-              ))}
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'bot' && (
-                  <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/20 flex items-center justify-center mr-2 mt-0.5 shrink-0">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
-                    </svg>
-                  </div>
-                )}
-                <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-br-sm' : 'bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-200 rounded-bl-sm'}`}>
-                  {renderMarkdown(msg.text)}
+          {activeRightTab === 'preferences' ? (
+            <>
+              {/* Progress */}
+              <div className="px-5 pt-4 pb-3 border-b border-slate-100 dark:border-white/5 shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-slate-400 dark:text-slate-500">
+                    {isDone ? 'Complete' : `Step ${Math.min(step + 1, STEPS.length)} of ${STEPS.length}`}
+                  </span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">{progressPercent}%</span>
                 </div>
-              </div>
-            ))}
-
-            {typing && (
-              <div className="flex justify-start">
-                <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/20 flex items-center justify-center mr-2 shrink-0">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
-                  </svg>
+                <div className="h-1 bg-slate-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                 </div>
-                <div className="bg-slate-100 dark:bg-gray-800 px-3.5 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                <div className="flex gap-1 mt-2.5">
+                  {STEPS.map((_, i) => (
+                    <div key={i} className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-sky-500' : 'bg-slate-300 dark:bg-gray-700'}`} />
                   ))}
                 </div>
               </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
 
-          {/* Input */}
-          <div className="px-4 py-3 border-t border-slate-100 dark:border-white/5 shrink-0">
-            {isDone ? (
-              <button onClick={() => router.push('/')} className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors">
-                Return to Home
-              </button>
-            ) : (
-              <div className="flex gap-2 items-center">
-                <input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder='Type your answer, or "done" to finish…'
-                  className="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/8 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500 outline-none focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/20 transition"
-                />
-                <button
-                  onClick={send}
-                  disabled={!input.trim()}
-                  className="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
-                  </svg>
-                </button>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'bot' && (
+                      <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/20 flex items-center justify-center mr-2 mt-0.5 shrink-0">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-sky-600 text-white rounded-br-sm' : 'bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-gray-200 rounded-bl-sm'}`}>
+                      {renderMarkdown(msg.text)}
+                    </div>
+                  </div>
+                ))}
+
+                {typing && (
+                  <div className="flex justify-start">
+                    <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/20 flex items-center justify-center mr-2 shrink-0">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+                      </svg>
+                    </div>
+                    <div className="bg-slate-100 dark:bg-gray-800 px-3.5 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
               </div>
-            )}
-            <p className="text-[10px] text-slate-400 dark:text-gray-600 text-center mt-1.5">
-              Try: &ldquo;CSIT 313 with Prof Brown, no morning classes, I work Mon–Fri 9 to 1&rdquo;
-            </p>
-          </div>
+
+              {/* Input */}
+              <div className="px-4 py-3 border-t border-slate-100 dark:border-white/5 shrink-0">
+                {isDone ? (
+                  <button onClick={() => router.push('/')} className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors">
+                    Return to Home
+                  </button>
+                ) : (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKey}
+                      placeholder='Type your answer, or "done" to finish…'
+                      className="flex-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-white/8 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500 outline-none focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/20 transition"
+                    />
+                    <button
+                      onClick={send}
+                      disabled={!input.trim()}
+                      className="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <p className="text-[10px] text-slate-400 dark:text-gray-600 text-center mt-1.5">
+                  Try: &ldquo;CSIT 313 with Prof Brown, no morning classes, I work Mon–Fri 9 to 1&rdquo;
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Schedule chat header */}
+              <div className="shrink-0 px-5 py-3.5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">AI Schedule Assistant</h2>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Add, edit, or ask about your schedule</p>
+                </div>
+                {scheduleEvents.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setScheduleEvents([]);
+                      setSchedChatMessages((prev) => [...prev, { role: 'assistant', text: 'Done — timetable cleared. Start fresh!' }]);
+                    }}
+                    className="text-[11px] text-slate-500 dark:text-slate-600 hover:text-red-400 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+
+              {/* Schedule chat messages */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2.5 min-h-0">
+                {schedChatMessages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[88%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                      msg.role === 'user'
+                        ? 'bg-sky-600 text-white rounded-br-sm'
+                        : 'bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 rounded-bl-sm'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+
+                {schedTyping && (
+                  <div className="flex justify-start">
+                    <div className="px-3.5 py-3 rounded-2xl rounded-bl-sm bg-slate-100 dark:bg-slate-800/70">
+                      <div className="flex gap-1 items-center">
+                        {[0, 150, 300].map((delay) => (
+                          <span key={delay} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={schedChatEndRef} />
+              </div>
+
+              {/* Suggestions */}
+              {schedSuggestions.length > 0 && !schedTyping && (
+                <div className="shrink-0 px-4 pb-2">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-600 mb-1.5">Suggested next:</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {schedSuggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => sendScheduleMessage(s)}
+                        className="px-2.5 py-1 rounded-full text-[11px] bg-sky-950/60 text-sky-400 border border-sky-800/40 hover:border-sky-600/60 hover:text-sky-300 transition-all leading-tight"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick examples */}
+              {scheduleEvents.length === 0 && !schedTyping && schedSuggestions.length === 0 && (
+                <div className="shrink-0 px-4 pb-2 space-y-1">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-600 px-1 mb-1.5">Try an example:</p>
+                  {[
+                    'I work Monday to Friday 9 AM to 5 PM',
+                    'Add gym Tuesday and Thursday at 7 AM for 1 hour',
+                    'Study Python Wednesday from 6 PM to 8 PM',
+                  ].map((ex) => (
+                    <button
+                      key={ex}
+                      onClick={() => setSchedChatInput(ex)}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40 hover:border-slate-200 dark:border-white/15 hover:text-slate-700 dark:hover:text-slate-200 transition-all truncate"
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Schedule chat input */}
+              <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-white/5">
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    ref={schedInputRef}
+                    value={schedChatInput}
+                    onChange={(e) => setSchedChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const text = schedChatInput.trim();
+                        if (text) { setSchedChatInput(''); sendScheduleMessage(text); }
+                      }
+                    }}
+                    placeholder="e.g. I work Monday 9 AM to 5 PM…"
+                    rows={2}
+                    className="flex-1 resize-none px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/70 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-sky-500/40 focus:ring-1 focus:ring-sky-500/20 transition-all leading-snug"
+                  />
+                  <button
+                    onClick={() => {
+                      const text = schedChatInput.trim();
+                      if (text) { setSchedChatInput(''); sendScheduleMessage(text); }
+                    }}
+                    disabled={!schedChatInput.trim() || schedTyping}
+                    className="w-9 h-9 rounded-xl bg-sky-600 flex items-center justify-center hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 mb-0.5"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-gray-600 mt-1.5">Enter to send · Shift+Enter for new line</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ════════════════════════ RIGHT — Tab panel ════════════════════════ */}
