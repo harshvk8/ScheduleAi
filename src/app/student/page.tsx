@@ -26,7 +26,7 @@ export default function StudentPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
+      <header className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 dark:border-white/5">
         <Logo />
         <button
           onClick={() => router.back()}
@@ -40,7 +40,7 @@ export default function StudentPage() {
       </header>
 
       {/* Main */}
-      <main className="flex-1 flex flex-col items-center px-6 py-16">
+      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-10 sm:py-16">
         <div className="w-full max-w-md">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 text-center">Select your university</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm text-center mb-8 leading-relaxed">

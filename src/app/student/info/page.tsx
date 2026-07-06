@@ -213,7 +213,7 @@ function StudentInfoForm() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
+      <header className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 dark:border-white/5">
         <Logo />
         <button
           onClick={() => router.back()}
@@ -226,7 +226,7 @@ function StudentInfoForm() {
         </button>
       </header>
 
-      <main className="flex-1 flex flex-col items-center px-6 py-14">
+      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-10 sm:py-14">
         <div className="w-full max-w-md">
           <StepBar current={1} />
 

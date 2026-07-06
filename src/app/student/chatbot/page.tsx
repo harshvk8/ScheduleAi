@@ -855,39 +855,39 @@ export default function StudentChatbotPage() {
   return (
     <div className="h-screen flex flex-col bg-white dark:bg-gray-950 text-slate-900 dark:text-gray-100 overflow-hidden">
       {/* ── Header ── */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/5 shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-100 dark:border-white/5 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Logo />
           {!aiEnabled && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25">
+            <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25 whitespace-nowrap">
               Regex mode
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/8 bg-white/90 dark:bg-slate-900/60">
-            <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/25 flex items-center justify-center text-sky-400 font-bold text-xs">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/8 bg-white/90 dark:bg-slate-900/60 min-w-0">
+            <div className="w-6 h-6 rounded-full bg-sky-500/15 border border-sky-500/25 flex items-center justify-center text-sky-400 font-bold text-xs shrink-0">
               {profile.name.charAt(0).toUpperCase()}
             </div>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{profile.name.split(' ')[0]}</span>
-            <span className="text-slate-500 dark:text-slate-600 text-xs">·</span>
-            <span className="text-xs text-slate-400 dark:text-slate-500">{profile.universityName}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">{profile.name.split(' ')[0]}</span>
+            <span className="hidden sm:inline text-slate-500 dark:text-slate-600 text-xs">·</span>
+            <span className="hidden sm:inline text-xs text-slate-400 dark:text-slate-500 truncate max-w-[140px]">{profile.universityName}</span>
           </div>
           <button
             onClick={() => router.push('/student/info')}
-            className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300 transition-colors shrink-0"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <path d="m15 18-6-6 6-6" />
             </svg>
-            Back
+            <span className="hidden sm:inline">Back</span>
           </button>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
         {/* ════════════════════════ LEFT — Chat ════════════════════════ */}
-        <div className="w-[42%] flex flex-col border-r border-slate-100 dark:border-white/5">
+        <div className="w-full h-[46vh] shrink-0 lg:h-auto lg:shrink lg:w-[42%] flex flex-col border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-white/5 min-h-0">
           {activeRightTab === 'preferences' ? (
             <>
               {/* Progress */}
@@ -1099,7 +1099,7 @@ export default function StudentChatbotPage() {
         </div>
 
         {/* ════════════════════════ RIGHT — Tab panel ════════════════════════ */}
-        <div className="flex-1 flex flex-col bg-slate-50 dark:bg-gray-900/40 overflow-hidden">
+        <div className="flex-1 flex flex-col bg-slate-50 dark:bg-gray-900/40 overflow-hidden min-h-0">
 
           {/* Tab switcher */}
           <div className="shrink-0 p-3 border-b border-slate-100 dark:border-white/5">

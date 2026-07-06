@@ -265,17 +265,17 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-white dark:bg-midnight text-slate-900 dark:text-white">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-slate-100 dark:border-white/5 bg-white/95 dark:bg-midnight/95 backdrop-blur-xl">
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 dark:border-white/5 bg-white/95 dark:bg-midnight/95 backdrop-blur-xl">
+        <div className="flex items-center gap-2 min-w-0">
           <Logo />
-          <span className="text-slate-500 dark:text-slate-600 text-sm">/</span>
-          <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Admin Dashboard</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-600 text-sm">/</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-400 text-sm font-medium truncate">Admin Dashboard</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <select
             value={selectedUnivId}
             onChange={(e) => setSelectedUnivId(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-sm focus:outline-none focus:border-sky/40 cursor-pointer"
+            className="max-w-[110px] sm:max-w-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-sky/40 cursor-pointer"
           >
             <option value="all">All Universities</option>
             {universities.map((u) => (
@@ -284,7 +284,7 @@ export default function AdminDashboard() {
           </select>
           <button
             onClick={load}
-            className="p-2 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all"
+            className="p-1.5 sm:p-2 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all shrink-0"
             title="Refresh data"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -294,7 +294,7 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={logout}
-            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 text-sm hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 text-xs sm:text-sm hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all shrink-0"
           >
             Logout
           </button>
@@ -303,12 +303,12 @@ export default function AdminDashboard() {
 
       {/* Tab bar */}
       <div className="border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-midnight/60">
-        <div className="px-8 max-w-7xl mx-auto flex gap-1 pt-2">
+        <div className="px-4 sm:px-8 max-w-7xl mx-auto flex gap-1 pt-2 overflow-x-auto">
           {(['analytics', 'bugs'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all ${
+              className={`px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all whitespace-nowrap ${
                 activeTab === tab
                   ? 'text-slate-900 dark:text-white border-b-2 border-sky'
                   : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300'
@@ -333,7 +333,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <main className="px-8 py-8 max-w-7xl mx-auto">
+      <main className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto">
         {error && (
           <div className="mb-6 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm">
             {error}
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
         {activeTab === 'analytics' ? (
           <>
             {/* Summary cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
               <StatCard label="Total Requests" value={stats.totalRequests} color="sky" />
               <StatCard label="Unique Students" value={stats.uniqueStudents} color="emerald" />
               <StatCard label="Universities" value={stats.uniqueUniversities} color="violet" />
@@ -729,7 +729,7 @@ function ProfessorFeedbackPanel({ feedback }: { feedback: ProfessorFeedbackDoc[]
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h2 className="text-slate-900 dark:text-white font-semibold">Professor Feedback Analytics</h2>
           <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
@@ -858,7 +858,7 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
     <div>
       {/* Summary row */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
           {(['all', 'high', 'medium', 'low'] as const).map((f) => (
             <button
               key={f}
@@ -915,14 +915,14 @@ function BugReportsPanel({ reports }: { reports: BugReportDoc[] }) {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-slate-700 dark:text-slate-200 text-sm leading-snug line-clamp-2">{report.aiSummary}</p>
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 dark:text-slate-600">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-slate-500 dark:text-slate-600">
                         <span>{new Date(report.timestamp).toLocaleString()}</span>
-                        <span>·</span>
+                        <span className="hidden sm:inline">·</span>
                         <span className="font-mono truncate max-w-[120px]">{report.sessionId}</span>
                         {report.lastUserAction && (
                           <>
-                            <span>·</span>
-                            <span className="truncate max-w-[200px]">Last action: "{report.lastUserAction}"</span>
+                            <span className="hidden sm:inline">·</span>
+                            <span className="truncate max-w-[160px] sm:max-w-[200px]">Last action: "{report.lastUserAction}"</span>
                           </>
                         )}
                       </div>

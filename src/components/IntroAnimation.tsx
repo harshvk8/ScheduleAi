@@ -333,11 +333,16 @@ export default function IntroAnimation({ onDone }: { onDone: () => void }) {
 
         {/* ── Clock: assembles, then face spins ── */}
         <div
+          className={exiting
+            ? 'scale-[.72] translate-x-[34%] -translate-y-[2%]'
+            : 'scale-[.6] sm:scale-[.8] md:scale-100 lg:scale-125 xl:scale-[1.75]'
+          }
           style={{
-            transform:  exiting ? 'scale(.72) translate(34%,-2%)' : 'scale(1.75)',
-            transition: 'transform 700ms cubic-bezier(.25,1,.5,1)',
-            position:   'relative',
-            zIndex:     5,
+            transitionProperty: 'transform',
+            transitionDuration: '700ms',
+            transitionTimingFunction: 'cubic-bezier(.25,1,.5,1)',
+            position: 'relative',
+            zIndex: 5,
           }}
         >
           <AssemblingClock />
@@ -345,8 +350,7 @@ export default function IntroAnimation({ onDone }: { onDone: () => void }) {
 
         {/* ── Status strip (after all photos absorbed) ── */}
         <div
-          className="absolute flex items-center gap-3 pointer-events-none"
-          style={{ bottom: 'calc(50% - 265px)' }}
+          className="absolute flex items-center gap-3 pointer-events-none bottom-[calc(50%-58px)] sm:bottom-[calc(50%-94px)] md:bottom-[calc(50%-130px)] lg:bottom-[calc(50%-175px)] xl:bottom-[calc(50%-265px)]"
         >
           <div className="h-px w-14 bg-sky-400/35 origin-right"
             style={{ animation: 'statusLine .5s ease-out 3100ms both' }} />

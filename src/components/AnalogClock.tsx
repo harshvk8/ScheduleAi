@@ -29,7 +29,7 @@ export default function AnalogClock({ introSpin }: { introSpin?: boolean } = {})
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  if (!t) return <div style={{ width: 360, height: 440 }} />;
+  if (!t) return <div className="w-[240px] h-[300px] sm:w-[300px] sm:h-[370px] md:w-[360px] md:h-[440px]" />;
 
   const { h, m, s, ms, date, tz } = t;
   const secF = s + ms / 1000;
@@ -90,7 +90,7 @@ export default function AnalogClock({ introSpin }: { introSpin?: boolean } = {})
 
   return (
     <div className="flex flex-col items-center select-none">
-      <svg width="360" height="360" viewBox="0 0 400 400">
+      <svg className="w-[240px] h-[240px] sm:w-[300px] sm:h-[300px] md:w-[360px] md:h-[360px]" viewBox="0 0 400 400">
         {introSpin && (
           <defs>
             <style>{`
@@ -165,13 +165,13 @@ export default function AnalogClock({ introSpin }: { introSpin?: boolean } = {})
 
       <div className="mt-1 text-center">
         <p
-          className="text-[56px] font-bold leading-none tracking-widest tabular-nums text-slate-900 dark:text-white"
+          className="text-[36px] sm:text-[46px] md:text-[56px] font-bold leading-none tracking-widest tabular-nums text-slate-900 dark:text-white"
           style={{ fontFamily: 'ui-monospace, monospace' }}
         >
           {hh}:{mm}:{ss}
         </p>
-        <p className="text-slate-500 text-sm mt-2 tracking-wider">{dateStr}</p>
-        <p className="text-slate-600 text-[11px] mt-1 tracking-wide" style={{ fontFamily: 'ui-monospace, monospace' }}>
+        <p className="text-slate-500 text-xs sm:text-sm mt-2 tracking-wider text-center px-4">{dateStr}</p>
+        <p className="text-slate-600 text-[10px] sm:text-[11px] mt-1 tracking-wide text-center px-4" style={{ fontFamily: 'ui-monospace, monospace' }}>
           {tz}&nbsp;·&nbsp;detected from your browser
         </p>
       </div>

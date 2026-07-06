@@ -163,7 +163,7 @@ function FeedbackForm() {
         <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
           Your review of <span className="text-slate-900 dark:text-white font-medium">{professorName}</span> has been saved and will help other students make better decisions.
         </p>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <button
             onClick={() => {
               setProfessorName(''); setCourseCode(''); setOverallRating(null);
@@ -366,20 +366,21 @@ export default function FeedbackPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-white/5">
-        <div className="flex items-center gap-2">
+      <header className="flex items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 dark:border-white/5">
+        <div className="flex items-center gap-2 min-w-0">
           <Logo />
-          <span className="text-slate-500 dark:text-slate-600 text-sm">/</span>
-          <span className="text-slate-500 dark:text-slate-400 text-sm font-medium">Feedback</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-600 text-sm">/</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-400 text-sm font-medium">Feedback</span>
         </div>
         <Link
           href="/professors"
-          className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150 whitespace-nowrap shrink-0"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
             <path d="m15 18-6-6 6-6" />
           </svg>
-          Back to professors
+          <span className="sm:hidden">Back</span>
+          <span className="hidden sm:inline">Back to professors</span>
         </Link>
       </header>
 
