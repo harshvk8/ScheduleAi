@@ -160,6 +160,7 @@ function NormalUserPage() {
   const [syncing, setSyncing] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [editForm, setEditForm] = useState({ title: '', day: '', startTime: '', endTime: '' });
+  const [mobileTab, setMobileTab] = useState<'chat' | 'timetable'>('chat');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -506,10 +507,30 @@ function NormalUserPage() {
         </div>
       </header>
 
+      {/* Mobile tab switcher — one full-height pane at a time below lg */}
+      <div className="lg:hidden shrink-0 flex gap-1.5 p-2 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-midnight">
+        <button
+          onClick={() => setMobileTab('chat')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            mobileTab === 'chat' ? 'bg-sky text-white' : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5'
+          }`}
+        >
+          Assistant
+        </button>
+        <button
+          onClick={() => setMobileTab('timetable')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            mobileTab === 'timetable' ? 'bg-sky text-white' : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5'
+          }`}
+        >
+          Timetable{events.length > 0 ? ` (${events.length})` : ''}
+        </button>
+      </div>
+
       {/* Body */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
         {/* ══ TIMETABLE ══ */}
-        <div className="w-full lg:flex-1 h-[42vh] lg:h-auto flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-white/5">
+        <div className={`${mobileTab === 'timetable' ? 'flex' : 'hidden'} lg:flex flex-1 flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-white/5`}>
           {/* Day header */}
           <div className="shrink-0 flex border-b border-slate-100 dark:border-white/5 bg-slate-100 dark:bg-slate-950/60">
             <div className="w-12 shrink-0" />
@@ -596,7 +617,7 @@ function NormalUserPage() {
         </div>
 
         {/* ══ CHAT PANEL ══ */}
-        <div className="w-full flex-1 lg:flex-none lg:w-72 xl:w-80 lg:shrink-0 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950/40">
+        <div className={`${mobileTab === 'chat' ? 'flex' : 'hidden'} lg:flex flex-1 lg:flex-none lg:w-72 xl:w-80 lg:shrink-0 flex-col min-h-0 bg-slate-50 dark:bg-slate-950/40`}>
           {/* Chat header */}
           <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/5">
             <div>
@@ -731,13 +752,13 @@ function NormalUserPage() {
           {/* Suggestions strip */}
           {suggestions.length > 0 && !typing && (
             <div className="shrink-0 px-3 pb-2">
-              <p className="text-[10px] text-slate-500 dark:text-slate-600 mb-1.5 px-0.5">Suggested next:</p>
+              <p className="text-xs lg:text-[10px] text-slate-500 dark:text-slate-600 mb-1.5 px-0.5">Suggested next:</p>
               <div className="flex gap-1.5 flex-wrap">
                 {suggestions.map((s, i) => (
                   <button
                     key={i}
                     onClick={() => sendText(s)}
-                    className="px-2.5 py-1 rounded-full text-[11px] bg-sky-950/60 text-sky-400 border border-sky-800/40 hover:border-sky-600/60 hover:text-sky-300 transition-all leading-tight"
+                    className="px-2.5 py-1.5 lg:py-1 rounded-full text-xs lg:text-[11px] bg-sky-950/60 text-sky-400 border border-sky-800/40 hover:border-sky-600/60 hover:text-sky-300 transition-all leading-tight"
                   >
                     {s}
                   </button>
@@ -749,7 +770,7 @@ function NormalUserPage() {
           {/* Quick examples (shown when no events yet) */}
           {events.length === 0 && !typing && suggestions.length === 0 && (
             <div className="shrink-0 px-3 pb-2 space-y-1">
-              <p className="text-[10px] text-slate-500 dark:text-slate-600 px-1 mb-1.5">Try an example:</p>
+              <p className="text-xs lg:text-[10px] text-slate-500 dark:text-slate-600 px-1 mb-1.5">Try an example:</p>
               {[
                 'I work Monday to Friday 9 AM to 5 PM',
                 'Add gym Tuesday and Thursday at 7 AM for 1 hour',
@@ -758,7 +779,7 @@ function NormalUserPage() {
                 <button
                   key={ex}
                   onClick={() => setInput(ex)}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40 hover:border-slate-200 dark:border-white/15 hover:text-slate-700 dark:hover:text-slate-200 transition-all truncate"
+                  className="w-full text-left px-2.5 py-2 lg:py-1.5 rounded-lg text-xs lg:text-[11px] text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40 hover:border-slate-200 dark:border-white/15 hover:text-slate-700 dark:hover:text-slate-200 transition-all truncate"
                 >
                   {ex}
                 </button>
@@ -787,7 +808,7 @@ function NormalUserPage() {
                 </svg>
               </button>
             </div>
-            <p className="text-[10px] text-slate-700 mt-1.5 px-0.5">Enter to send · Shift+Enter for new line</p>
+            <p className="text-xs lg:text-[10px] text-slate-700 mt-1.5 px-0.5">Enter to send · Shift+Enter for new line</p>
           </div>
         </div>
       </div>

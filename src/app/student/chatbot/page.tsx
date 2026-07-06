@@ -506,6 +506,8 @@ export default function StudentChatbotPage() {
 
   // ── Right panel tab + My Schedule state ──────────────────────────────────────
   const [activeRightTab, setActiveRightTab] = useState<'preferences' | 'schedule'>('preferences');
+  // Mobile only: which full-height pane is showing (chat vs. the preferences/schedule panel)
+  const [mobileView, setMobileView] = useState<'chat' | 'panel'>('chat');
   const [scheduleEvents, setScheduleEvents] = useState<SchedEvent[]>([]);
   const [editingSchedEvent, setEditingSchedEvent] = useState<SchedEvent | null>(null);
   const [editSchedForm, setEditSchedForm] = useState({
@@ -885,9 +887,29 @@ export default function StudentChatbotPage() {
         </div>
       </header>
 
+      {/* Mobile tab switcher — one full-height pane at a time below lg */}
+      <div className="lg:hidden shrink-0 flex gap-1.5 p-2 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-gray-950">
+        <button
+          onClick={() => setMobileView('chat')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            mobileView === 'chat' ? 'bg-sky-600 text-white' : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5'
+          }`}
+        >
+          Chat
+        </button>
+        <button
+          onClick={() => setMobileView('panel')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            mobileView === 'panel' ? 'bg-sky-600 text-white' : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5'
+          }`}
+        >
+          {activeRightTab === 'preferences' ? 'Preferences' : 'My Schedule'}
+        </button>
+      </div>
+
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
         {/* ════════════════════════ LEFT — Chat ════════════════════════ */}
-        <div className="w-full h-[46vh] shrink-0 lg:h-auto lg:shrink lg:w-[42%] flex flex-col border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-white/5 min-h-0">
+        <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} lg:flex flex-1 lg:flex-none lg:w-[42%] flex-col border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-white/5 min-h-0`}>
           {activeRightTab === 'preferences' ? (
             <>
               {/* Progress */}
@@ -1099,7 +1121,7 @@ export default function StudentChatbotPage() {
         </div>
 
         {/* ════════════════════════ RIGHT — Tab panel ════════════════════════ */}
-        <div className="flex-1 flex flex-col bg-slate-50 dark:bg-gray-900/40 overflow-hidden min-h-0">
+        <div className={`${mobileView === 'panel' ? 'flex' : 'hidden'} lg:flex flex-1 flex-col bg-slate-50 dark:bg-gray-900/40 overflow-hidden min-h-0`}>
 
           {/* Tab switcher */}
           <div className="shrink-0 p-3 border-b border-slate-100 dark:border-white/5">
