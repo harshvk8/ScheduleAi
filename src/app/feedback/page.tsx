@@ -126,9 +126,6 @@ function FeedbackForm() {
 
     setSubmitting(true);
     try {
-      const storedRaw = sessionStorage.getItem('scheduleai_student');
-      const studentEmail = storedRaw ? (JSON.parse(storedRaw)?.email ?? null) : null;
-
       await saveProfessorFeedback({
         professorName: professorName.trim(),
         courseName: courseCode.trim().toUpperCase(),
@@ -140,7 +137,6 @@ function FeedbackForm() {
         attendanceStrictness: attendanceStrictness ?? undefined,
         wouldTakeAgain: wouldTakeAgain ?? undefined,
         comment: comment.trim() || undefined,
-        studentEmail: studentEmail ?? undefined,
       });
       setDone(true);
     } catch (err) {

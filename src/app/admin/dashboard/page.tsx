@@ -8,12 +8,10 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import {
-  getAllScheduleRequests,
-  getAllUniversities,
-  getAllProfessorFeedback,
+  getScheduleRequestsByUniversity,
+  getProfessorFeedbackByUniversity,
   getBugReports,
   ScheduleRequestDoc,
-  UniversityDoc,
   ProfessorFeedbackDoc,
   BugReportDoc,
 } from '@/lib/db';
@@ -45,6 +43,12 @@ interface DayStat {
   label: string;
   short: string;
   count: number;
+  avoidCount: number;
+}
+
+interface ModalityStat {
+  label: string;
+  count: number;
 }
 
 interface DayTimeStat {
@@ -55,12 +59,13 @@ interface DayTimeStat {
 interface DashStats {
   totalRequests: number;
   uniqueStudents: number;
-  uniqueUniversities: number;
   uniqueCourses: number;
+  uniqueProfessors: number;
   courseStats: CourseStats[];
   professorStats: ProfessorStat[];
   timeSlots: TimeSlotStat[];
   dayStats: DayStat[];
+  modalityStats: ModalityStat[];
   dayTimeMatrix: Record<string, Record<string, DayTimeStat>>;
 }
 
@@ -76,7 +81,6 @@ const DAY_SHORT: Record<string, string> = {
 function computeStats(requests: ScheduleRequestDoc[]): DashStats {
   const totalRequests = requests.length;
   const uniqueStudents = new Set(requests.map((r) => r.studentEmail)).size;
-  const uniqueUniversities = new Set(requests.map((r) => r.universityId)).size;
 
   const courseMap = new Map<string, {
     count: number;
@@ -91,7 +95,10 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
   TIME_SLOTS.forEach((t) => globalTime.set(t, { prefer: 0, avoid: 0 }));
 
   const globalDay = new Map<string, number>();
-  DAYS.forEach((d) => globalDay.set(d, 0));
+  const globalDayAvoid = new Map<string, number>();
+  DAYS.forEach((d) => { globalDay.set(d, 0); globalDayAvoid.set(d, 0); });
+
+  const modalityMap = new Map<string, number>();
 
   for (const req of requests) {
     for (const t of req.generalPreferTimes ?? []) {
@@ -104,6 +111,9 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
     }
     for (const d of req.generalPreferDays ?? []) {
       globalDay.set(d, (globalDay.get(d) ?? 0) + 1);
+    }
+    for (const d of req.generalAvoidDays ?? []) {
+      globalDayAvoid.set(d, (globalDayAvoid.get(d) ?? 0) + 1);
     }
 
     for (const course of req.courses ?? []) {
@@ -139,6 +149,16 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
         cs.prefDays.set(d, (cs.prefDays.get(d) ?? 0) + 1);
         globalDay.set(d, (globalDay.get(d) ?? 0) + 1);
       }
+
+      const avoidDays = (course.avoidDays?.length ?? 0) > 0
+        ? course.avoidDays
+        : (req.generalAvoidDays ?? []);
+      for (const d of avoidDays) {
+        globalDayAvoid.set(d, (globalDayAvoid.get(d) ?? 0) + 1);
+      }
+
+      const modality = course.modality || req.defaultModality;
+      if (modality) modalityMap.set(modality, (modalityMap.get(modality) ?? 0) + 1);
     }
   }
 
@@ -172,7 +192,12 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
     label,
     short: DAY_SHORT[label],
     count: globalDay.get(label) ?? 0,
+    avoidCount: globalDayAvoid.get(label) ?? 0,
   }));
+
+  const modalityStats: ModalityStat[] = Array.from(modalityMap.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
 
   const dayTimeMatrix: Record<string, Record<string, DayTimeStat>> = {};
   DAYS.forEach((d) => {
@@ -195,7 +220,12 @@ function computeStats(requests: ScheduleRequestDoc[]): DashStats {
     }
   }
 
-  return { totalRequests, uniqueStudents, uniqueUniversities, uniqueCourses: courseStats.length, courseStats, professorStats, timeSlots, dayStats, dayTimeMatrix };
+  return {
+    totalRequests, uniqueStudents,
+    uniqueCourses: courseStats.length,
+    uniqueProfessors: profMap.size,
+    courseStats, professorStats, timeSlots, dayStats, modalityStats, dayTimeMatrix,
+  };
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -204,13 +234,11 @@ export default function AdminDashboard() {
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<ScheduleRequestDoc[]>([]);
-  const [universities, setUniversities] = useState<UniversityDoc[]>([]);
   const [feedback, setFeedback] = useState<ProfessorFeedbackDoc[]>([]);
   const [bugReports, setBugReports] = useState<BugReportDoc[]>([]);
-  const [activeTab, setActiveTab] = useState<'analytics' | 'bugs'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'requests' | 'bugs'>('analytics');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedUnivId, setSelectedUnivId] = useState('all');
 
   useEffect(() => {
     if (!authLoading && (!user || profile?.role !== 'admin')) {
@@ -218,18 +246,18 @@ export default function AdminDashboard() {
     }
   }, [user, profile, authLoading, router]);
 
-  async function load() {
+  const universityId = profile?.universityId;
+
+  async function load(uid: string) {
     setLoading(true);
     setError('');
     try {
-      const [reqs, univs, fbs, bugs] = await Promise.all([
-        getAllScheduleRequests(),
-        getAllUniversities(),
-        getAllProfessorFeedback(),
+      const [reqs, fbs, bugs] = await Promise.all([
+        getScheduleRequestsByUniversity(uid),
+        getProfessorFeedbackByUniversity(uid),
         getBugReports(),
       ]);
       setRequests(reqs);
-      setUniversities(univs);
       setFeedback(fbs);
       setBugReports(bugs);
     } catch (err) {
@@ -240,19 +268,30 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (universityId) load(universityId);
+    else setLoading(false);
+  }, [universityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = useMemo(
-    () => selectedUnivId === 'all' ? requests : requests.filter((r) => r.universityId === selectedUnivId),
-    [requests, selectedUnivId]
-  );
+  const stats = useMemo(() => computeStats(requests), [requests]);
 
-  const filteredFeedback = useMemo(
-    () => selectedUnivId === 'all' ? feedback : feedback.filter((f) => f.universityId === selectedUnivId),
-    [feedback, selectedUnivId]
-  );
-
-  const stats = useMemo(() => computeStats(filtered), [filtered]);
+  const professorRatings = useMemo(() => {
+    const byProf = new Map<string, ProfessorFeedbackDoc[]>();
+    for (const f of feedback) {
+      const key = f.professorName.trim().toLowerCase();
+      if (!byProf.has(key)) byProf.set(key, []);
+      byProf.get(key)!.push(f);
+    }
+    const map = new Map<string, { avgRating: number | null; reviewCount: number }>();
+    for (const [key, fbs] of byProf) {
+      const ratings = fbs.filter((f) => f.rating != null).map((f) => f.rating!);
+      map.set(key, {
+        avgRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
+        reviewCount: fbs.length,
+      });
+    }
+    return map;
+  }, [feedback]);
 
   async function logout() {
     await signOut(auth);
@@ -261,6 +300,7 @@ export default function AdminDashboard() {
 
   if (authLoading || loading) return <LoadingScreen />;
   if (!user || profile?.role !== 'admin') return null;
+  if (!universityId) return <SetupNeededScreen onLogout={logout} />;
 
   return (
     <div className="min-h-screen bg-white dark:bg-midnight text-slate-900 dark:text-white">
@@ -269,21 +309,13 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2 min-w-0">
           <Logo />
           <span className="hidden sm:inline text-slate-500 dark:text-slate-600 text-sm">/</span>
-          <span className="hidden sm:inline text-slate-500 dark:text-slate-400 text-sm font-medium truncate">Admin Dashboard</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-400 text-sm font-medium truncate">
+            {profile.universityName ?? 'Admin Dashboard'}
+          </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <select
-            value={selectedUnivId}
-            onChange={(e) => setSelectedUnivId(e.target.value)}
-            className="max-w-[110px] sm:max-w-none px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-sky/40 cursor-pointer"
-          >
-            <option value="all">All Universities</option>
-            {universities.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
           <button
-            onClick={load}
+            onClick={() => load(universityId)}
             className="p-1.5 sm:p-2 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all shrink-0"
             title="Refresh data"
           >
@@ -304,7 +336,7 @@ export default function AdminDashboard() {
       {/* Tab bar */}
       <div className="border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-midnight/60">
         <div className="px-4 sm:px-8 max-w-7xl mx-auto flex gap-1 pt-2 overflow-x-auto">
-          {(['analytics', 'bugs'] as const).map((tab) => (
+          {(['analytics', 'requests', 'bugs'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -314,7 +346,18 @@ export default function AdminDashboard() {
                   : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300'
               }`}
             >
-              {tab === 'analytics' ? 'Schedule Analytics' : (
+              {tab === 'analytics' && 'Schedule Analytics'}
+              {tab === 'requests' && (
+                <span className="flex items-center gap-2">
+                  Student Requests
+                  {requests.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-slate-700 text-slate-500 dark:text-slate-400">
+                      {requests.length}
+                    </span>
+                  )}
+                </span>
+              )}
+              {tab === 'bugs' && (
                 <span className="flex items-center gap-2">
                   Bug Reports
                   {bugReports.length > 0 && (
@@ -340,43 +383,49 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'analytics' ? (
+        {activeTab === 'analytics' && (
           <>
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
               <StatCard label="Total Requests" value={stats.totalRequests} color="sky" />
               <StatCard label="Unique Students" value={stats.uniqueStudents} color="emerald" />
-              <StatCard label="Universities" value={stats.uniqueUniversities} color="violet" />
               <StatCard label="Courses Tracked" value={stats.uniqueCourses} color="amber" />
+              <StatCard label="Professors Named" value={stats.uniqueProfessors} color="violet" />
             </div>
 
             {stats.totalRequests === 0 ? (
               <EmptyState />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 space-y-6">
                   <CourseDemandTable courses={stats.courseStats} totalRequests={stats.totalRequests} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <AvailabilityHeatmapPanel dayTimeMatrix={stats.dayTimeMatrix} />
+                    <AvoidedSlotsHeatmapPanel dayTimeMatrix={stats.dayTimeMatrix} />
+                  </div>
                 </div>
                 <div className="space-y-5">
-                  <ProfessorDemandPanel professors={stats.professorStats} />
-                  <AvailabilityHeatmapPanel dayTimeMatrix={stats.dayTimeMatrix} />
+                  <ProfessorDemandPanel professors={stats.professorStats} ratings={professorRatings} />
                   <TimePreferencesPanel timeSlots={stats.timeSlots} totalRequests={stats.totalRequests} />
                   <DayPreferencesPanel days={stats.dayStats} />
+                  <ModalityPanel modality={stats.modalityStats} />
                 </div>
-                {filteredFeedback.length > 0 && (
+                {feedback.length > 0 && (
                   <div className="lg:col-span-3">
-                    <ProfessorFeedbackPanel feedback={filteredFeedback} />
+                    <ProfessorFeedbackPanel feedback={feedback} />
                   </div>
                 )}
               </div>
             )}
           </>
-        ) : (
-          <BugReportsPanel reports={bugReports} />
         )}
 
+        {activeTab === 'requests' && <RequestsPanel requests={requests} />}
+
+        {activeTab === 'bugs' && <BugReportsPanel reports={bugReports} />}
+
         <p className="mt-12 text-center text-slate-700 text-xs">
-          Student names and emails are not displayed to protect privacy · ScheduleAI Admin Dashboard
+          Student names and emails are never displayed — requests are shown as &ldquo;Student N&rdquo; only · ScheduleAI Admin Dashboard
         </p>
       </main>
     </div>
@@ -511,34 +560,47 @@ function CourseDemandTable({ courses, totalRequests }: { courses: CourseStats[];
   );
 }
 
-function ProfessorDemandPanel({ professors }: { professors: ProfessorStat[] }) {
+function ProfessorDemandPanel({ professors, ratings }: {
+  professors: ProfessorStat[];
+  ratings: Map<string, { avgRating: number | null; reviewCount: number }>;
+}) {
   const max = professors[0]?.count ?? 1;
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 p-5">
       <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Professor Demand</h3>
-      <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Most requested by students</p>
+      <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Most requested by students · rating shown when reviewed</p>
       {professors.length === 0 ? (
         <p className="text-slate-500 dark:text-slate-600 text-sm">No professor preferences recorded yet</p>
       ) : (
         <div className="space-y-3.5">
-          {professors.map((prof) => (
-            <div key={prof.name}>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-slate-600 dark:text-slate-300 text-xs truncate max-w-[160px]">{prof.name}</span>
-                <span className="text-slate-900 dark:text-white font-semibold text-sm ml-2 shrink-0">{prof.count}</span>
+          {professors.map((prof) => {
+            const r = ratings.get(prof.name.trim().toLowerCase());
+            return (
+              <div key={prof.name}>
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <span className="text-slate-600 dark:text-slate-300 text-xs truncate max-w-[140px]">{prof.name}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {r?.avgRating != null && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap">
+                        ★ {r.avgRating.toFixed(1)}
+                      </span>
+                    )}
+                    <span className="text-slate-900 dark:text-white font-semibold text-sm">{prof.count}</span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-sky/60 rounded-full transition-all duration-500"
+                    style={{ width: `${(prof.count / max) * 100}%` }}
+                  />
+                </div>
+                {prof.courses.length > 0 && (
+                  <p className="text-slate-500 dark:text-slate-600 text-xs mt-1 truncate">{prof.courses.join(', ')}</p>
+                )}
               </div>
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-sky/60 rounded-full transition-all duration-500"
-                  style={{ width: `${(prof.count / max) * 100}%` }}
-                />
-              </div>
-              {prof.courses.length > 0 && (
-                <p className="text-slate-500 dark:text-slate-600 text-xs mt-1 truncate">{prof.courses.join(', ')}</p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -597,29 +659,89 @@ function TimePreferencesPanel({ timeSlots, totalRequests }: { timeSlots: TimeSlo
 }
 
 function DayPreferencesPanel({ days }: { days: DayStat[] }) {
-  const max = Math.max(...days.map((d) => d.count), 1);
+  const max = Math.max(...days.map((d) => Math.max(d.count, d.avoidCount)), 1);
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 p-5">
       <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Day Preferences</h3>
-      <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Most requested days</p>
+      <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Most requested vs. most avoided days</p>
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day) => {
           const heightPct = (day.count / max) * 100;
+          const avoidHeightPct = (day.avoidCount / max) * 100;
           return (
             <div key={day.short} className="flex flex-col items-center gap-1">
-              <div className="w-full h-14 flex items-end">
-                <div
-                  className="w-full rounded-t bg-sky/40 transition-all duration-500"
-                  style={{ height: `${heightPct}%`, minHeight: day.count > 0 ? '4px' : '0px' }}
-                />
+              <div className="w-full h-14 flex items-end gap-0.5">
+                <div className="flex-1 h-full flex items-end">
+                  <div
+                    className="w-full rounded-t bg-sky/40 transition-all duration-500"
+                    style={{ height: `${heightPct}%`, minHeight: day.count > 0 ? '4px' : '0px' }}
+                    title={`${day.count} prefer`}
+                  />
+                </div>
+                <div className="flex-1 h-full flex items-end">
+                  <div
+                    className="w-full rounded-t bg-red-500/40 transition-all duration-500"
+                    style={{ height: `${avoidHeightPct}%`, minHeight: day.avoidCount > 0 ? '4px' : '0px' }}
+                    title={`${day.avoidCount} avoid`}
+                  />
+                </div>
               </div>
               <span className="text-slate-400 dark:text-slate-500 text-xs">{day.short}</span>
-              <span className="text-slate-500 dark:text-slate-600 text-xs">{day.count}</span>
             </div>
           );
         })}
       </div>
+      <div className="mt-4 flex gap-4 text-xs text-slate-500 dark:text-slate-600">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-sky/40 inline-block" /> Prefer
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-red-500/40 inline-block" /> Avoid
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const MODALITY_STYLE: Record<string, string> = {
+  online: 'bg-violet-500/60',
+  hybrid: 'bg-amber-500/60',
+  'in-person': 'bg-emerald-500/60',
+};
+
+function ModalityPanel({ modality }: { modality: ModalityStat[] }) {
+  const total = modality.reduce((a, m) => a + m.count, 0) || 1;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 p-5">
+      <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Format Preferences</h3>
+      <p className="text-slate-400 dark:text-slate-500 text-xs mb-5">Online vs. hybrid vs. in-person demand</p>
+      {modality.length === 0 ? (
+        <p className="text-slate-500 dark:text-slate-600 text-sm">No format preferences recorded yet</p>
+      ) : (
+        <div className="space-y-3">
+          {modality.map((m) => (
+            <div key={m.label}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-slate-600 dark:text-slate-300 text-sm capitalize">{m.label}</span>
+                <span className="text-slate-900 dark:text-white font-semibold text-sm">
+                  {m.count}
+                  <span className="text-slate-500 dark:text-slate-600 font-normal text-xs ml-1">
+                    ({Math.round((m.count / total) * 100)}%)
+                  </span>
+                </span>
+              </div>
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${MODALITY_STYLE[m.label] ?? 'bg-slate-500/60'}`}
+                  style={{ width: `${(m.count / total) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -631,18 +753,16 @@ const ADMIN_DAYS_SHORT: Record<string, string> = {
 };
 const ADMIN_DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-function AvailabilityHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<string, Record<string, { prefer: number; avoid: number }>> }) {
+function AvailabilityHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<string, Record<string, DayTimeStat>> }) {
   const allVals = ADMIN_DAYS_ORDER.flatMap((d) => ADMIN_TIME_SLOTS.map((t) => dayTimeMatrix[d]?.[t]?.prefer ?? 0));
   const maxVal = Math.max(...allVals, 1);
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
-        <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Availability Heatmap</h3>
+        <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Best Times To Schedule</h3>
         <p className="text-slate-400 dark:text-slate-500 text-xs">When students prefer to have classes</p>
       </div>
-      {/* Day header row */}
       <div className="flex bg-slate-100 dark:bg-slate-950/60 border-b border-slate-100 dark:border-white/5">
         <div className="w-[4.5rem] shrink-0" />
         {ADMIN_DAYS_ORDER.map((d) => (
@@ -651,7 +771,6 @@ function AvailabilityHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<str
           </div>
         ))}
       </div>
-      {/* Time rows */}
       {ADMIN_TIME_SLOTS.map((time, idx) => (
         <div
           key={time}
@@ -675,7 +794,6 @@ function AvailabilityHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<str
           })}
         </div>
       ))}
-      {/* Legend */}
       <div className="flex items-center gap-3 px-4 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/10">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(14,165,233,0.08)' }} />
@@ -685,6 +803,62 @@ function AvailabilityHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<str
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(14,165,233,0.8)' }} />
           <span className="text-[9px] text-slate-400 dark:text-slate-500">High demand</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AvoidedSlotsHeatmapPanel({ dayTimeMatrix }: { dayTimeMatrix: Record<string, Record<string, DayTimeStat>> }) {
+  const allVals = ADMIN_DAYS_ORDER.flatMap((d) => ADMIN_TIME_SLOTS.map((t) => dayTimeMatrix[d]?.[t]?.avoid ?? 0));
+  const maxVal = Math.max(...allVals, 1);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
+        <h3 className="text-slate-900 dark:text-white font-semibold mb-0.5">Times That Don&apos;t Work</h3>
+        <p className="text-slate-400 dark:text-slate-500 text-xs">When students say they&apos;re unavailable</p>
+      </div>
+      <div className="flex bg-slate-100 dark:bg-slate-950/60 border-b border-slate-100 dark:border-white/5">
+        <div className="w-[4.5rem] shrink-0" />
+        {ADMIN_DAYS_ORDER.map((d) => (
+          <div key={d} className="flex-1 py-2 text-center">
+            <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{ADMIN_DAYS_SHORT[d]}</p>
+          </div>
+        ))}
+      </div>
+      {ADMIN_TIME_SLOTS.map((time, idx) => (
+        <div
+          key={time}
+          className={`flex ${idx < ADMIN_TIME_SLOTS.length - 1 ? 'border-b border-slate-100 dark:border-white/[0.04]' : ''}`}
+        >
+          <div className="w-[4.5rem] shrink-0 py-2.5 flex items-center pl-4 border-r border-slate-100 dark:border-white/5">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{time}</span>
+          </div>
+          {ADMIN_DAYS_ORDER.map((day) => {
+            const cell = dayTimeMatrix[day]?.[time] ?? { prefer: 0, avoid: 0 };
+            const intensity = cell.avoid / maxVal;
+            return (
+              <div key={day} className="flex-1 p-1.5 border-r border-slate-100 dark:border-white/[0.04] last:border-r-0">
+                <div
+                  className="h-8 rounded-md transition-all duration-500"
+                  style={{ backgroundColor: `rgba(239, 68, 68, ${0.08 + intensity * 0.72})` }}
+                  title={`${day} ${time}: ${cell.avoid} avoid`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      <div className="flex items-center gap-3 px-4 py-3 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/10">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(239,68,68,0.08)' }} />
+          <span className="text-[9px] text-slate-400 dark:text-slate-500">Low</span>
+        </div>
+        <div className="h-2 flex-1 rounded-full" style={{ background: 'linear-gradient(to right, rgba(239,68,68,0.08), rgba(239,68,68,0.8))' }} />
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(239,68,68,0.8)' }} />
+          <span className="text-[9px] text-slate-400 dark:text-slate-500">Most avoided</span>
         </div>
       </div>
     </div>
@@ -805,6 +979,137 @@ function ProfessorFeedbackPanel({ feedback }: { feedback: ProfessorFeedbackDoc[]
     </div>
   );
 }
+
+// ─── Student Requests (anonymized drill-down) ─────────────────────────────────
+
+function Chip({ kind, children }: { kind: 'prefer' | 'avoid' | 'neutral'; children: React.ReactNode }) {
+  const styles = {
+    prefer: 'bg-emerald-900/40 text-emerald-400 ring-1 ring-emerald-800/40',
+    avoid: 'bg-red-900/40 text-red-400 ring-1 ring-red-800/40',
+    neutral: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
+  };
+  return (
+    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${styles[kind]}`}>
+      {children}
+    </span>
+  );
+}
+
+function RequestDetail({ request }: { request: ScheduleRequestDoc }) {
+  const hasGeneral =
+    (request.generalPreferTimes?.length ?? 0) > 0 ||
+    (request.generalAvoidTimes?.length ?? 0) > 0 ||
+    (request.generalPreferDays?.length ?? 0) > 0 ||
+    (request.generalAvoidDays?.length ?? 0) > 0;
+
+  return (
+    <div className="px-6 pb-5 space-y-3 bg-slate-950/20">
+      {(request.courses ?? []).map((c, idx) => (
+        <div key={idx} className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="font-mono font-bold text-sky text-sm">{c.course}</span>
+            {c.modality && <Chip kind="neutral">{c.modality}</Chip>}
+          </div>
+          {c.preferredProfessor && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+              Prefers <span className="text-slate-700 dark:text-slate-200 font-medium">{c.preferredProfessor}</span>
+            </p>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {c.preferredTimes?.map((t) => <Chip key={`pt-${t}`} kind="prefer">✓ {t}</Chip>)}
+            {c.avoidTimes?.map((t) => <Chip key={`at-${t}`} kind="avoid">✕ {t}</Chip>)}
+            {c.preferredDays?.map((d) => <Chip key={`pd-${d}`} kind="prefer">{d.slice(0, 3)}</Chip>)}
+            {c.avoidDays?.map((d) => <Chip key={`ad-${d}`} kind="avoid">no {d.slice(0, 3)}</Chip>)}
+          </div>
+        </div>
+      ))}
+
+      {hasGeneral && (
+        <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3">
+          <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">General availability</p>
+          <div className="flex flex-wrap gap-1.5">
+            {request.generalPreferTimes?.map((t) => <Chip key={`gpt-${t}`} kind="prefer">✓ {t}</Chip>)}
+            {request.generalAvoidTimes?.map((t) => <Chip key={`gat-${t}`} kind="avoid">✕ {t}</Chip>)}
+            {request.generalPreferDays?.map((d) => <Chip key={`gpd-${d}`} kind="prefer">{d.slice(0, 3)}</Chip>)}
+            {request.generalAvoidDays?.map((d) => <Chip key={`gad-${d}`} kind="avoid">no {d.slice(0, 3)}</Chip>)}
+          </div>
+        </div>
+      )}
+
+      {(request.constraints?.length ?? 0) > 0 && (
+        <div className="px-1">
+          <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Constraints</p>
+          <div className="space-y-1">
+            {request.constraints.map((c, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.type === 'work' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                <span className="text-xs text-slate-600 dark:text-slate-300">{c.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequestsPanel({ requests }: { requests: ScheduleRequestDoc[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const millis = (t: any) => (t && typeof t.toMillis === 'function' ? t.toMillis() : 0);
+  const sorted = [...requests].sort((a, b) => millis(b.submittedAt) - millis(a.submittedAt));
+
+  if (sorted.length === 0) return <EmptyState />;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5">
+        <h2 className="text-slate-900 dark:text-white font-semibold">Student Requests</h2>
+        <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
+          Anonymized — no names or emails · {sorted.length} {sorted.length === 1 ? 'request' : 'requests'}
+        </p>
+      </div>
+      <div className="divide-y divide-white/[0.04]">
+        {sorted.map((r, i) => {
+          const label = sorted.length - i;
+          const expanded = expandedId === r.id;
+          return (
+            <div key={r.id}>
+              <button
+                onClick={() => setExpandedId(expanded ? null : r.id)}
+                className="w-full px-6 py-4 text-left hover:bg-white/[0.02] transition-colors flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-sky/10 border border-sky/20 flex items-center justify-center text-sky text-xs font-bold shrink-0">
+                    {label}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-slate-900 dark:text-white font-medium text-sm">Student {label}</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs truncate">
+                      {(r.courses?.length ?? 0)} {(r.courses?.length ?? 0) === 1 ? 'course' : 'courses'}
+                      {r.defaultModality ? ` · ${r.defaultModality}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  className={`shrink-0 text-slate-500 dark:text-slate-600 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {expanded && <RequestDetail request={r} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty / Loading / Setup states ───────────────────────────────────────────
 
 function EmptyState() {
   return (
@@ -992,6 +1297,33 @@ function LoadingScreen() {
           </svg>
         </div>
         <p className="text-slate-500 dark:text-slate-400 text-sm">Loading dashboard…</p>
+      </div>
+    </div>
+  );
+}
+
+function SetupNeededScreen({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="min-h-screen bg-white dark:bg-midnight flex items-center justify-center px-6">
+      <div className="max-w-sm text-center">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-5">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" x2="12" y1="9" y2="13" />
+            <line x1="12" x2="12.01" y1="17" y2="17" />
+          </svg>
+        </div>
+        <h2 className="text-slate-900 dark:text-white font-semibold text-lg mb-2">University not set</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6">
+          Your admin account was created before university selection was required, so we can&apos;t scope your dashboard safely.
+          Please sign out and register a new admin account, selecting your university this time.
+        </p>
+        <button
+          onClick={onLogout}
+          className="px-5 py-2.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 transition-all"
+        >
+          Sign out
+        </button>
       </div>
     </div>
   );

@@ -1,18 +1,82 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // An admin may only ever touch data scoped to their own university.
+    function isAdminFor(universityId) {
+      return isSignedIn()
+        && myProfile().role == 'admin'
+        && myProfile().universityId == universityId;
+    }
+
+    // ── users ── (Firebase Auth UID-keyed profile: student / admin / normal_user)
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── scheduleRequests ── carries real student name/email.
+    // Only the owning admin (matched by universityId) may ever read these;
+    // never the public, never students, never a cross-university admin.
+    match /scheduleRequests/{id} {
+      allow create: if isSignedIn();
+      allow read: if isAdminFor(resource.data.universityId);
+      allow update, delete: if false;
+    }
+
+    // ── professorFeedback ── intentionally public (powers /professors);
+    // the app never writes a student name/email into these documents.
+    match /professorFeedback/{id} {
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if false;
+    }
+
+    // ── professorDemand ── anonymized aggregate (professor + course + count
+    // only). Public read; only a signed-in user can bump the counters.
+    match /professorDemand/{id} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // ── professors / universities ── low-sensitivity reference data.
+    match /professors/{id} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /universities/{id} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // ── calendarEvents ── the unauthenticated "normal user" flow keys these
+    // off a random session id in sessionStorage, not a Firebase Auth account.
+    // No email/name is ever stored here.
+    match /calendarEvents/{id} {
+      allow read, write: if true;
+    }
+
+    // ── bugReports ── must be creatable even from a broken/unauthenticated
+    // session; only a signed-in admin can read them back.
+    match /bugReports/{id} {
+      allow create: if true;
+      allow read: if isSignedIn() && myProfile().role == 'admin';
+      allow update, delete: if false;
+    }
+
+    // Everything else is denied by default.
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2028, 12, 31);
+      allow read, write: if false;
     }
   }
 }

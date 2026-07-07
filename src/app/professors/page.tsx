@@ -4,9 +4,9 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import {
-  getAllScheduleRequests,
+  getAllProfessorDemand,
   getAllProfessorFeedback,
-  ScheduleRequestDoc,
+  ProfessorDemandDoc,
   ProfessorFeedbackDoc,
 } from '@/lib/db';
 import { useRouter } from 'next/navigation';
@@ -31,40 +31,28 @@ interface ProfessorProfile {
 // ─── Aggregation ──────────────────────────────────────────────────────────────
 
 function buildProfiles(
-  requests: ScheduleRequestDoc[],
+  demand: ProfessorDemandDoc[],
   feedback: ProfessorFeedbackDoc[]
 ): ProfessorProfile[] {
   const map = new Map<string, ProfessorProfile>();
 
-  // Seed from schedule requests — this is where most professor names live
-  for (const req of requests) {
-    for (const course of req.courses ?? []) {
-      const rawName = course.preferredProfessor?.trim();
-      if (!rawName) continue;
-      const key = rawName.toLowerCase();
-
-      if (!map.has(key)) {
-        map.set(key, {
-          name: rawName,
-          universityName: req.universityName,
-          universityId: req.universityId,
-          courses: [],
-          requestCount: 0,
-          avgRating: null,
-          avgDifficulty: null,
-          avgClarity: null,
-          avgWorkload: null,
-          wouldTakeAgainPct: null,
-          feedbackCount: 0,
-          recentComments: [],
-        });
-      }
-
-      const p = map.get(key)!;
-      p.requestCount++;
-      const cn = course.course?.toUpperCase().trim();
-      if (cn && !p.courses.includes(cn)) p.courses.push(cn);
-    }
+  // Seed from the anonymized professor-demand aggregate (no student identity here)
+  for (const d of demand) {
+    const key = d.professorName.trim().toLowerCase();
+    map.set(key, {
+      name: d.professorName.trim(),
+      universityName: d.universityName,
+      universityId: d.universityId,
+      courses: [...(d.courses ?? [])],
+      requestCount: d.requestCount ?? 0,
+      avgRating: null,
+      avgDifficulty: null,
+      avgClarity: null,
+      avgWorkload: null,
+      wouldTakeAgainPct: null,
+      feedbackCount: 0,
+      recentComments: [],
+    });
   }
 
   // Group feedback by professor name
@@ -142,11 +130,11 @@ export default function ProfessorsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [requests, feedback] = await Promise.all([
-          getAllScheduleRequests(),
+        const [demand, feedback] = await Promise.all([
+          getAllProfessorDemand(),
           getAllProfessorFeedback(),
         ]);
-        setProfiles(buildProfiles(requests, feedback));
+        setProfiles(buildProfiles(demand, feedback));
       } catch (err) {
         console.error('[Professors] Firestore fetch failed:', err);
         setProfiles([]);

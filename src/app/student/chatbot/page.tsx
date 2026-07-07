@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { saveScheduleRequest, getAllProfessorFeedback, getAllScheduleRequests } from '@/lib/db';
+import { saveScheduleRequest, getProfessorFeedbackByUniversity, getProfessorDemandByUniversity } from '@/lib/db';
 import type { ChatApiResponse } from '@/app/api/chat/route';
 import type { CalendarChatResponse } from '@/app/api/calendar-chat/route';
 
@@ -518,30 +518,41 @@ export default function StudentChatbotPage() {
   useEffect(() => {
     const raw = sessionStorage.getItem('studentProfile');
     if (!raw) { router.replace('/student'); return; }
+
+    let parsedProfile: StudentProfile;
     try {
-      const p = JSON.parse(raw) as StudentProfile;
-      setProfile(p);
-      const firstName = p.name.split(' ')[0];
-      setTimeout(() => {
-        setMessages([{ role: 'bot', text: STEPS[0](firstName) }]);
-      }, 300);
+      parsedProfile = JSON.parse(raw) as StudentProfile;
     } catch {
       router.replace('/student');
+      return;
     }
 
-    // Pre-fetch professor feedback so we can recommend
-    Promise.all([getAllScheduleRequests(), getAllProfessorFeedback()])
-      .then(([reqs, feedback]) => {
+    setProfile(parsedProfile);
+    const firstName = parsedProfile.name.split(' ')[0];
+    setTimeout(() => {
+      setMessages([{ role: 'bot', text: STEPS[0](firstName) }]);
+    }, 300);
+
+    // Pre-fetch professor data to recommend — scoped to this student's own
+    // university and sourced from the anonymized demand aggregate, never
+    // raw scheduleRequests, so no other student's name/email ever reaches
+    // this browser.
+    const universityId = parsedProfile.universityId;
+    if (!universityId) return;
+
+    Promise.all([
+      getProfessorDemandByUniversity(universityId),
+      getProfessorFeedbackByUniversity(universityId),
+    ])
+      .then(([demand, feedback]) => {
         const map = new Map<string, AvailableProfessor>();
-        for (const req of reqs) {
-          for (const c of req.courses ?? []) {
-            const name = c.preferredProfessor?.trim();
-            if (!name) continue;
-            const key = name.toLowerCase();
-            if (!map.has(key)) map.set(key, { name, courses: [], avgRating: null, wouldTakeAgainPct: null });
-            const cn = c.course?.toUpperCase();
-            if (cn && !map.get(key)!.courses.includes(cn)) map.get(key)!.courses.push(cn);
-          }
+        for (const d of demand) {
+          map.set(d.professorName.trim().toLowerCase(), {
+            name: d.professorName.trim(),
+            courses: [...(d.courses ?? [])],
+            avgRating: null,
+            wouldTakeAgainPct: null,
+          });
         }
         const fbByProf = new Map<string, typeof feedback>();
         for (const fb of feedback) {
@@ -549,20 +560,20 @@ export default function StudentChatbotPage() {
           if (!fbByProf.has(key)) fbByProf.set(key, []);
           fbByProf.get(key)!.push(fb);
         }
-        for (const [key, p] of map) {
+        for (const [key, prof] of map) {
           const fbs = fbByProf.get(key) ?? [];
           const ratings = fbs.filter((f) => f.rating != null).map((f) => f.rating!);
-          p.avgRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+          prof.avgRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
           const wtaVotes = fbs.filter((f) => f.wouldTakeAgain != null);
-          p.wouldTakeAgainPct = wtaVotes.length
+          prof.wouldTakeAgainPct = wtaVotes.length
             ? (wtaVotes.filter((f) => f.wouldTakeAgain).length / wtaVotes.length) * 100
             : null;
           for (const fb of fbs) {
             const cn = fb.courseName?.toUpperCase().trim();
-            if (cn && !p.courses.includes(cn)) p.courses.push(cn);
+            if (cn && !prof.courses.includes(cn)) prof.courses.push(cn);
           }
         }
-        setAvailableProfs(Array.from(map.values()).filter((p) => p.avgRating != null));
+        setAvailableProfs(Array.from(map.values()).filter((prof) => prof.avgRating != null));
       })
       .catch(() => {/* non-critical */});
   }, [router]);

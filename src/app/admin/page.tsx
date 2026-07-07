@@ -12,6 +12,7 @@ import {
 import { auth } from '@/lib/firebase';
 import { saveUserProfile, getUserProfile } from '@/lib/db';
 import { useAuth } from '@/lib/AuthContext';
+import { UNIVERSITIES } from '@/data/universities';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ export default function AdminPage() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [regName, setRegName] = useState('');
-  const [regUniversity, setRegUniversity] = useState('');
+  const [regUniversityId, setRegUniversityId] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPass, setRegPass] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
@@ -85,8 +86,9 @@ export default function AdminPage() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setRegError('');
+    const university = UNIVERSITIES.find((u) => u.id === regUniversityId);
     if (!regName.trim()) { setRegError('Enter your full name.'); return; }
-    if (!regUniversity.trim()) { setRegError('Enter your university name.'); return; }
+    if (!university) { setRegError('Select your university.'); return; }
     if (regPass !== regConfirm) { setRegError('Passwords do not match.'); return; }
     if (regPass.length < 6) { setRegError('Password must be at least 6 characters.'); return; }
 
@@ -97,7 +99,8 @@ export default function AdminPage() {
         email: regEmail.trim().toLowerCase(),
         name: regName.trim(),
         role: 'admin',
-        universityName: regUniversity.trim(),
+        universityId: university.id,
+        universityName: university.name,
       });
       router.push('/admin/dashboard');
     } catch (err) {
@@ -197,8 +200,13 @@ export default function AdminPage() {
               </div>
               <div>
                 <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">University</label>
-                <input type="text" value={regUniversity} onChange={(e) => setRegUniversity(e.target.value)}
-                  placeholder="Montclair State University" required className={inputCls} />
+                <select value={regUniversityId} onChange={(e) => setRegUniversityId(e.target.value)}
+                  required className={`${inputCls} cursor-pointer`}>
+                  <option value="">Select your university</option>
+                  {UNIVERSITIES.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Email</label>

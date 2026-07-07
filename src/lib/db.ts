@@ -11,6 +11,7 @@ import {
   where,
   getDocs,
   increment,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -23,7 +24,7 @@ const COL = {
   calendarEvents: 'calendarEvents',
   professors: 'professors',
   professorFeedback: 'professorFeedback',
-  adminAccounts: 'adminAccounts',
+  professorDemand: 'professorDemand',
   bugReports: 'bugReports',
 } as const;
 
@@ -137,7 +138,62 @@ export async function saveScheduleRequest(
     submittedAt: serverTimestamp(),
   };
   const ref = await addDoc(collection(db, COL.scheduleRequests), payload);
+
+  // Best-effort: bump the public, name/email-free professor-demand aggregate.
+  // This is what public/unauthenticated surfaces (the professors page, the
+  // student chatbot's recommender) read from instead of raw scheduleRequests.
+  await Promise.allSettled(
+    preferences.courses
+      .filter((c) => c.preferredProfessor?.trim())
+      .map((c) =>
+        bumpProfessorDemand(universityId, universityName, c.preferredProfessor!.trim(), c.course)
+      )
+  );
+
   return ref.id;
+}
+
+async function bumpProfessorDemand(
+  universityId: string,
+  universityName: string,
+  professorName: string,
+  course: string
+) {
+  const key = professorName.toLowerCase().replace(/\s+/g, '_');
+  const ref = doc(db, COL.professorDemand, `${universityId}__${key}`);
+  await setDoc(
+    ref,
+    {
+      universityId,
+      universityName,
+      professorName,
+      courses: arrayUnion(course.toUpperCase().trim()),
+      requestCount: increment(1),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export interface ProfessorDemandDoc {
+  id: string;
+  universityId: string;
+  universityName: string;
+  professorName: string;
+  courses: string[];
+  requestCount: number;
+}
+
+// Public-safe: no student name/email ever lives in this collection.
+export async function getAllProfessorDemand(): Promise<ProfessorDemandDoc[]> {
+  const snap = await getDocs(collection(db, COL.professorDemand));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessorDemandDoc));
+}
+
+export async function getProfessorDemandByUniversity(universityId: string): Promise<ProfessorDemandDoc[]> {
+  const q = query(collection(db, COL.professorDemand), where('universityId', '==', universityId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessorDemandDoc));
 }
 
 // ─── calendarEvents ───────────────────────────────────────────────────────────
@@ -234,6 +290,8 @@ export async function saveProfessor(professor: {
 
 // ─── professorFeedback ────────────────────────────────────────────────────────
 
+// This collection is intentionally public-readable (it powers the /professors
+// ratings page), so it must never carry student name/email — no field for it.
 export async function saveProfessorFeedback(feedback: {
   professorName: string;
   courseName: string;
@@ -245,7 +303,6 @@ export async function saveProfessorFeedback(feedback: {
   attendanceStrictness?: number;
   wouldTakeAgain?: boolean;
   comment?: string;
-  studentEmail?: string;
 }): Promise<string> {
   const ref = await addDoc(collection(db, COL.professorFeedback), {
     professorName: feedback.professorName,
@@ -258,7 +315,6 @@ export async function saveProfessorFeedback(feedback: {
     attendanceStrictness: feedback.attendanceStrictness ?? null,
     wouldTakeAgain: feedback.wouldTakeAgain ?? null,
     comment: feedback.comment ?? null,
-    studentEmail: feedback.studentEmail ?? null,
     submittedAt: serverTimestamp(),
   });
   return ref.id;
@@ -297,23 +353,17 @@ export interface ScheduleRequestDoc {
   submittedAt: any;
 }
 
-export interface UniversityDoc {
-  id: string;
-  name: string;
-  domain: string;
-  studentCount: number;
-}
-
 // ─── Admin queries ────────────────────────────────────────────────────────────
+//
+// These carry raw student names/emails, so they are ONLY ever called from the
+// admin dashboard — and only scoped to the signed-in admin's own university.
+// Firestore security rules enforce this server-side too (see firestore.rules);
+// there is no unscoped "get everything" query left in this file on purpose.
 
-export async function getAllScheduleRequests(): Promise<ScheduleRequestDoc[]> {
-  const snap = await getDocs(collection(db, COL.scheduleRequests));
+export async function getScheduleRequestsByUniversity(universityId: string): Promise<ScheduleRequestDoc[]> {
+  const q = query(collection(db, COL.scheduleRequests), where('universityId', '==', universityId));
+  const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ScheduleRequestDoc));
-}
-
-export async function getAllUniversities(): Promise<UniversityDoc[]> {
-  const snap = await getDocs(collection(db, COL.universities));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as UniversityDoc));
 }
 
 export interface ProfessorFeedbackDoc {
@@ -328,13 +378,19 @@ export interface ProfessorFeedbackDoc {
   attendanceStrictness: number | null;
   wouldTakeAgain: boolean | null;
   comment: string | null;
-  studentEmail: string | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   submittedAt: any;
 }
 
+// Public-safe (no student identity in this collection) — used by /professors.
 export async function getAllProfessorFeedback(): Promise<ProfessorFeedbackDoc[]> {
   const snap = await getDocs(collection(db, COL.professorFeedback));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessorFeedbackDoc));
+}
+
+export async function getProfessorFeedbackByUniversity(universityId: string): Promise<ProfessorFeedbackDoc[]> {
+  const q = query(collection(db, COL.professorFeedback), where('universityId', '==', universityId));
+  const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProfessorFeedbackDoc));
 }
 
@@ -368,41 +424,6 @@ export async function getUserProfile(uid: string): Promise<UserProfileDoc | null
   const snap = await getDoc(doc(db, COL.users, uid));
   if (!snap.exists()) return null;
   return { uid, ...snap.data() } as UserProfileDoc;
-}
-
-// ─── Admin accounts ───────────────────────────────────────────────────────────
-
-export interface AdminAccount {
-  id: string;
-  name: string;
-  email: string;
-  universityName: string;
-  password: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  createdAt: any;
-}
-
-export async function createAdminAccount(account: {
-  name: string;
-  email: string;
-  universityName: string;
-  password: string;
-}): Promise<void> {
-  const docId = emailToDocId(account.email);
-  await setDoc(doc(db, COL.adminAccounts, docId), {
-    name: account.name,
-    email: account.email.toLowerCase(),
-    universityName: account.universityName,
-    password: account.password,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export async function getAdminAccount(email: string): Promise<AdminAccount | null> {
-  const docId = emailToDocId(email);
-  const snap = await getDoc(doc(db, COL.adminAccounts, docId));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as AdminAccount;
 }
 
 // ─── bugReports ───────────────────────────────────────────────────────────────
