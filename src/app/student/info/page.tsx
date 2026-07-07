@@ -91,10 +91,10 @@ function TermsModal({ onClose, onAgree }: { onClose: () => void; onAgree: () => 
 
         <div className="flex-1 overflow-y-auto px-6 py-5 text-sm text-slate-600 dark:text-slate-300 leading-relaxed space-y-5">
           <div className="px-3.5 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs leading-relaxed">
-            <strong>Notice:</strong> This document is a template intended to give ScheduleAI a strong, comprehensive starting
-            point for informing students how their data is collected and used. It is not a substitute for advice from a
-            licensed attorney. Before relying on this as your binding, production Terms &amp; Conditions, have it reviewed
-            by counsel familiar with FERPA, applicable state law, and the jurisdictions where your students are enrolled.
+            <strong>Notice — Draft, Pending Legal Review:</strong> This Terms &amp; Conditions and Privacy Policy is a
+            working draft provided to describe our current data practices in good faith. It has not yet completed formal
+            review by legal counsel and remains subject to revision as that review is completed. We will notify users of
+            material changes once the final, reviewed version is published.
           </div>
 
           <section>
