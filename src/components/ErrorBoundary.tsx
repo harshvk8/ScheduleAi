@@ -2,6 +2,26 @@
 
 import React from 'react';
 
+// Browser extensions (password managers, ad blockers, translators, devtools,
+// etc.) inject content scripts into every page and frequently throw unrelated
+// errors/rejections that bubble up to window.onerror / unhandledrejection.
+// These have nothing to do with app code — don't waste an AI analysis call
+// or clutter the admin bug-report dashboard with them.
+const NOISE_PATTERNS = [
+  /No Listener:/i,
+  /Extension context invalidated/i,
+  /Could not establish connection\. Receiving end does not exist/i,
+  /chrome-extension:\/\//i,
+  /moz-extension:\/\//i,
+  /safari-extension:\/\//i,
+  /ResizeObserver loop/i,
+  /^Script error\.?$/i,
+];
+
+function isNoise(message: string, stack: string): boolean {
+  return NOISE_PATTERNS.some((re) => re.test(message) || re.test(stack));
+}
+
 interface Props {
   children: React.ReactNode;
 }
@@ -24,11 +44,14 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidMount() {
     this.windowErrorHandler = (event: ErrorEvent) => {
-      this.sendReport(event.message, event.error?.stack ?? '', 'window.onerror');
+      const stack = event.error?.stack ?? '';
+      if (isNoise(event.message, stack)) return;
+      this.sendReport(event.message, stack, 'window.onerror');
     };
     this.unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
       const msg = event.reason instanceof Error ? event.reason.message : String(event.reason);
       const stack = event.reason instanceof Error ? (event.reason.stack ?? '') : '';
+      if (isNoise(msg, stack)) return;
       this.sendReport(msg, stack, 'unhandledrejection');
     };
     window.addEventListener('error', this.windowErrorHandler);
