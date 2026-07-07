@@ -13,6 +13,7 @@ import { auth } from '@/lib/firebase';
 import { saveUserProfile, getUserProfile } from '@/lib/db';
 import { useAuth } from '@/lib/AuthContext';
 import { UNIVERSITIES } from '@/data/universities';
+import PasswordInput from '@/components/PasswordInput';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -164,8 +165,8 @@ export default function AdminPage() {
               </div>
               <div>
                 <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Password</label>
-                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
-                  placeholder="••••••••" required className={inputCls} />
+                <PasswordInput value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
+                  placeholder="••••••••" required inputClassName={inputCls} />
               </div>
               {loginError && <p className="text-red-400 text-xs">{loginError}</p>}
               <button type="submit" disabled={loginLoading}
@@ -216,13 +217,13 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Password</label>
-                  <input type="password" value={regPass} onChange={(e) => setRegPass(e.target.value)}
-                    placeholder="••••••" required className={inputCls} />
+                  <PasswordInput value={regPass} onChange={(e) => setRegPass(e.target.value)}
+                    placeholder="••••••" required inputClassName={inputCls} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-700 dark:text-slate-400 mb-1.5 font-medium">Confirm</label>
-                  <input type="password" value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)}
-                    placeholder="••••••" required className={inputCls} />
+                  <PasswordInput value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)}
+                    placeholder="••••••" required inputClassName={inputCls} />
                 </div>
               </div>
               {regError && <p className="text-red-400 text-xs">{regError}</p>}

@@ -12,6 +12,7 @@ import {
   AuthError,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import PasswordInput from '@/components/PasswordInput';
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -501,14 +502,14 @@ function StudentInfoForm() {
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Password" error={errors.password}>
-                    <input type="password" placeholder="Min 6 chars" value={password}
+                    <PasswordInput placeholder="Min 6 chars" value={password}
                       onChange={(e) => { setPassword(e.target.value); clearError('password'); }}
-                      autoComplete="new-password" className={inputCls(!!errors.password)} />
+                      autoComplete="new-password" inputClassName={inputCls(!!errors.password)} />
                   </Field>
                   <Field label="Confirm" error={errors.confirmPassword}>
-                    <input type="password" placeholder="Repeat" value={confirmPassword}
+                    <PasswordInput placeholder="Repeat" value={confirmPassword}
                       onChange={(e) => { setConfirmPassword(e.target.value); clearError('confirmPassword'); }}
-                      autoComplete="new-password" className={inputCls(!!errors.confirmPassword)} />
+                      autoComplete="new-password" inputClassName={inputCls(!!errors.confirmPassword)} />
                   </Field>
                 </div>
 
@@ -576,9 +577,9 @@ function StudentInfoForm() {
                       {resetLoading ? 'Sending…' : 'Forgot password?'}
                     </button>
                   </div>
-                  <input type="password" placeholder="••••••••" value={retPassword}
+                  <PasswordInput placeholder="••••••••" value={retPassword}
                     onChange={(e) => setRetPassword(e.target.value)}
-                    autoComplete="current-password" className={inputCls(false)} />
+                    autoComplete="current-password" inputClassName={inputCls(false)} />
                 </div>
                 {resetSent && (
                   <div className="px-3.5 py-2.5 rounded-xl border border-green-500/20 bg-green-500/10 text-green-400 text-sm">

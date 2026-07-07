@@ -59,3 +59,58 @@ html.dark body {
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-new(root) { animation: none; }
 }
+
+/* ── Page navigation transition: a clock-hand sweep ── */
+@property --sweep {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.page-sweep {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  --sweep: 0%;
+  --sweep-color: #f8fafc;
+  background: conic-gradient(from 0deg at 50% 50%, var(--sweep-color) var(--sweep), transparent var(--sweep));
+}
+
+html.dark .page-sweep {
+  --sweep-color: #030712;
+}
+
+.page-sweep-closing {
+  animation: pageSweepIn 420ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.page-sweep-covered {
+  --sweep: 100%;
+}
+
+.page-sweep-opening {
+  animation: pageSweepOut 420ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes pageSweepIn  { from { --sweep: 0%; }   to { --sweep: 100%; } }
+@keyframes pageSweepOut { from { --sweep: 100%; } to { --sweep: 0%; } }
+
+.page-sweep-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 9999px;
+  background: #38bdf8;
+  opacity: 0;
+  box-shadow: 0 0 16px 2px rgba(56, 189, 248, 0.6);
+  animation: pageSweepDot 900ms ease-in-out 160ms both;
+}
+
+@keyframes pageSweepDot {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  30%, 70% { opacity: 1; transform: scale(1); }
+}
