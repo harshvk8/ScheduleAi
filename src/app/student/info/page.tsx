@@ -8,6 +8,7 @@ import { saveUserProfile, getUserProfile } from '@/lib/db';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInAnonymously,
   sendPasswordResetEmail,
   AuthError,
 } from 'firebase/auth';
@@ -323,16 +324,19 @@ function StudentInfoForm() {
   const universityId = params.get('university') ?? '';
   const university = getUniversity(universityId);
 
-  const [mode, setMode] = useState<'new' | 'returning'>('new');
+  const [mode, setMode] = useState<'quick' | 'create' | 'signin'>('quick');
 
-  // New student
+  // Quick start (guest)
+  const [quickEmail, setQuickEmail] = useState('');
+
+  // Create account
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [studentId, setStudentId] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Returning student
+  // Sign in
   const [retEmail, setRetEmail] = useState('');
   const [retPassword, setRetPassword] = useState('');
 
@@ -352,7 +356,55 @@ function StudentInfoForm() {
   const clearError = (field: string) =>
     setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
 
-  // ── New student ───────────────────────────────────────────────────────────
+  const switchMode = (m: 'quick' | 'create' | 'signin') => {
+    setMode(m); setAuthError(''); setErrors({}); setResetSent(false);
+  };
+
+  // ── Quick start (guest) ───────────────────────────────────────────────────
+  const handleQuickContinue = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setAuthError('');
+    const e: Record<string, string> = {};
+
+    const trimmedEmail = quickEmail.trim();
+    if (trimmedEmail) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) e.quickEmail = 'Enter a valid email address';
+      else if (!trimmedEmail.toLowerCase().endsWith(`@${university.domain}`)) e.quickEmail = `Must end with @${university.domain}`;
+    }
+    if (!agreedToTerms) e.terms = 'You must agree to the Terms & Conditions to continue';
+
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
+
+    setSaving(true);
+    try {
+      let uid = auth.currentUser?.uid;
+      if (!uid) {
+        const cred = await signInAnonymously(auth);
+        uid = cred.user.uid;
+      }
+      const profileData = {
+        name: 'Guest Student',
+        email: trimmedEmail.toLowerCase(),
+        studentId: '',
+        universityId,
+        universityName: university.name,
+        domain: university.domain,
+      };
+      sessionStorage.setItem('studentProfile', JSON.stringify({ ...profileData, uid }));
+      router.push('/student/chatbot');
+    } catch (err) {
+      const code = (err as AuthError)?.code;
+      console.error('[quick-start] anonymous sign-in failed:', code, err);
+      setAuthError(
+        code === 'auth/admin-restricted-operation' || code === 'auth/operation-not-allowed'
+          ? "Guest access isn't enabled for this app yet — please create an account or sign in instead."
+          : friendlyAuthError(err as AuthError)
+      );
+      setSaving(false);
+    }
+  };
+
+  // ── Create account ───────────────────────────────────────────────────────
   const handleNewSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     setAuthError('');
@@ -465,21 +517,82 @@ function StudentInfoForm() {
             <span className="ml-auto text-xs text-slate-500 dark:text-slate-600 shrink-0">{university.domain}</span>
           </div>
 
-          {/* Mode toggle */}
-          <div className="flex rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/40 p-1 mb-8">
-            {(['new', 'returning'] as const).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setAuthError(''); setErrors({}); }}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  mode === m ? 'bg-sky text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}>
-                {m === 'new' ? 'New student' : 'Returning student'}
-              </button>
-            ))}
-          </div>
-
-          {/* ── New student ── */}
-          {mode === 'new' && (
+          {/* ── Quick start (guest) ── */}
+          {mode === 'quick' && (
             <>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Let&apos;s get started</h1>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
+                Jump straight into the chatbot. Your university email is optional — add it if you want, or leave it blank.
+              </p>
+              <form onSubmit={handleQuickContinue} noValidate className="space-y-5">
+                <Field label="University email (optional)" hint={`If provided, must end with @${university.domain}`} error={errors.quickEmail}>
+                  <input type="email" placeholder={`you@${university.domain}`} value={quickEmail}
+                    onChange={(e) => { setQuickEmail(e.target.value); clearError('quickEmail'); }}
+                    autoComplete="email" className={inputCls(!!errors.quickEmail)} />
+                </Field>
+
+                <div>
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={agreedToTerms}
+                      onChange={(e) => { setAgreedToTerms(e.target.checked); clearError('terms'); }}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-white/20 text-sky focus:ring-sky/40 shrink-0"
+                    />
+                    <span className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      I have read and agree to the{' '}
+                      <button type="button" onClick={() => setShowTerms(true)} className="text-sky hover:text-sky/80 underline underline-offset-2">
+                        Terms &amp; Conditions and Privacy Policy
+                      </button>
+                    </span>
+                  </label>
+                  {errors.terms && (
+                    <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      {errors.terms}
+                    </p>
+                  )}
+                </div>
+
+                {authError && (
+                  <div className="px-3.5 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm">
+                    {authError}
+                  </div>
+                )}
+                <button type="submit" disabled={saving}
+                  className="w-full mt-2 py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                  {saving ? 'Starting…' : 'Continue to chatbot'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </form>
+
+              <p className="mt-5 text-xs text-slate-500 dark:text-slate-500 text-center leading-relaxed">
+                Want your schedule saved and available on other devices?{' '}
+                <button type="button" onClick={() => switchMode('create')} className="text-sky hover:text-sky/80 underline underline-offset-2">
+                  Create an account
+                </button>{' '}
+                or{' '}
+                <button type="button" onClick={() => switchMode('signin')} className="text-sky hover:text-sky/80 underline underline-offset-2">
+                  sign in
+                </button>.
+              </p>
+            </>
+          )}
+
+          {/* ── Create account ── */}
+          {mode === 'create' && (
+            <>
+              <button type="button" onClick={() => switchMode('quick')}
+                className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors mb-4">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+                Continue as guest instead
+              </button>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Create your account</h1>
               <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
                 Your university email and student ID personalise your scheduling experience.
@@ -554,9 +667,16 @@ function StudentInfoForm() {
             </>
           )}
 
-          {/* ── Returning student ── */}
-          {mode === 'returning' && (
+          {/* ── Sign in ── */}
+          {mode === 'signin' && (
             <>
+              <button type="button" onClick={() => switchMode('quick')}
+                className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors mb-4">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+                Continue as guest instead
+              </button>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Welcome back</h1>
               <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Sign in with your ScheduleAI student account.</p>
               <form onSubmit={handleReturnSubmit} noValidate className="space-y-5">

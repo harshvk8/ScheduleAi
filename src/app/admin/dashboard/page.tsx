@@ -1038,14 +1038,13 @@ function RequestDetail({ request }: { request: ScheduleRequestDoc }) {
 
       {(request.constraints?.length ?? 0) > 0 && (
         <div className="px-1">
-          <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Constraints</p>
-          <div className="space-y-1">
-            {request.constraints.map((c, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.type === 'work' ? 'bg-amber-400' : 'bg-red-400'}`} />
-                <span className="text-xs text-slate-600 dark:text-slate-300">{c.description}</span>
-              </div>
-            ))}
+          <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">Other commitments</p>
+          {/* Never render the raw constraint description here — it can carry a
+              student's personal activity (e.g. a job). Admins only ever see that
+              the student is unavailable, never what for. */}
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-400" />
+            <span className="text-xs text-slate-600 dark:text-slate-300">Student is busy at other times</span>
           </div>
         </div>
       )}

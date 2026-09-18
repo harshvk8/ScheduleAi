@@ -63,6 +63,7 @@ export default function AdminPage() {
   const [regConfirm, setRegConfirm] = useState('');
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
+  const [regSuccess, setRegSuccess] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +74,7 @@ export default function AdminPage() {
       const prof = await getUserProfile(cred.user.uid);
       if (!prof || prof.role !== 'admin') {
         await auth.signOut();
-        setLoginError('This account does not have admin access.');
+        setLoginError("This account doesn't have admin access yet — ask an existing admin to grant it.");
         setLoginLoading(false);
         return;
       }
@@ -87,6 +88,7 @@ export default function AdminPage() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setRegError('');
+    setRegSuccess(false);
     const university = UNIVERSITIES.find((u) => u.id === regUniversityId);
     if (!regName.trim()) { setRegError('Enter your full name.'); return; }
     if (!university) { setRegError('Select your university.'); return; }
@@ -99,13 +101,19 @@ export default function AdminPage() {
       await saveUserProfile(cred.user.uid, {
         email: regEmail.trim().toLowerCase(),
         name: regName.trim(),
-        role: 'admin',
+        // Registering here only creates a normal account — an existing admin
+        // has to grant dashboard access by flipping this doc's role to
+        // 'admin' in Firestore. No form input can self-assign admin.
+        role: 'normal_user',
         universityId: university.id,
         universityName: university.name,
       });
-      router.push('/admin/dashboard');
+      await auth.signOut();
+      setRegSuccess(true);
+      setRegName(''); setRegUniversityId(''); setRegEmail(''); setRegPass(''); setRegConfirm('');
     } catch (err) {
       setRegError(friendlyError(err as AuthError));
+    } finally {
       setRegLoading(false);
     }
   }
@@ -135,7 +143,7 @@ export default function AdminPage() {
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Admin portal</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Admin Portal</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">University administrators only</p>
         </div>
 
@@ -189,7 +197,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <h2 className="text-slate-900 dark:text-white font-semibold text-sm">Create account</h2>
-                <p className="text-slate-500 dark:text-slate-500 text-xs">Register as university admin</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs">An admin will grant you access afterward</p>
               </div>
             </div>
 
@@ -227,6 +235,11 @@ export default function AdminPage() {
                 </div>
               </div>
               {regError && <p className="text-red-400 text-xs">{regError}</p>}
+              {regSuccess && (
+                <p className="text-emerald-500 text-xs">
+                  Account created. Ask an existing admin to grant you access, then sign in on the left.
+                </p>
+              )}
               <button type="submit" disabled={regLoading}
                 className="mt-auto w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-600/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all">
                 {regLoading ? 'Creating account…' : 'Create account'}

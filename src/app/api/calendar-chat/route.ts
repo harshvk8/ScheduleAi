@@ -185,6 +185,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const client = new Anthropic({ apiKey });
 
+  // Short messages ("done", "yes", "add gym") rarely need Sonnet-level
+  // reasoning — route them to Haiku and save cost/latency.
+  const model = lastMsg.trim().length > 20 ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+
   // Keep only the last 10 turns to cap per-call token cost
   const trimmedMessages = messages.slice(-10);
 
@@ -201,7 +205,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 1024,
       system: [
         {

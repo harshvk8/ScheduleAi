@@ -1,12 +1,34 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 type Phase = 'idle' | 'closing' | 'covered' | 'opening';
 
 const SWEEP_MS = 420;
 const COVERED_TIMEOUT_MS = 4000;
+// Floor on how long the cover stays fully shut, so the letter-drop label
+// always has room to finish its animation even on fast client-side navs.
+const MIN_COVERED_MS = 620;
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/': 'Home',
+  '/admin': 'Admin',
+  '/admin/dashboard': 'Dashboard',
+  '/professors': 'Professors',
+  '/feedback': 'Feedback',
+  '/normal-user': 'Scheduler',
+  '/student': 'Student',
+  '/student/info': 'Student Setup',
+  '/student/chatbot': 'Assistant',
+};
+
+function labelForPath(path: string): string {
+  if (ROUTE_LABELS[path]) return ROUTE_LABELS[path];
+  const last = path.split('/').filter(Boolean).pop();
+  if (!last) return 'ScheduleAI';
+  return last.charAt(0).toUpperCase() + last.slice(1);
+}
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -16,16 +38,26 @@ export default function PageTransition() {
   const router = useRouter();
   const pathname = usePathname();
   const [phase, setPhase] = useState<Phase>('idle');
+  const [label, setLabel] = useState('');
   const pendingHref = useRef<string | null>(null);
   const prevPathname = useRef(pathname);
+  const coveredAt = useRef(0);
+  const routeReady = useRef(false);
 
-  // Reveal once the destination route has actually mounted behind the cover.
+  const revealWhenReady = useCallback(() => {
+    if (!routeReady.current) return;
+    const remaining = Math.max(0, MIN_COVERED_MS - (Date.now() - coveredAt.current));
+    setTimeout(() => setPhase((p) => (p === 'covered' ? 'opening' : p)), remaining);
+  }, []);
+
+  // The destination route has actually mounted behind the cover.
   useEffect(() => {
     if (pathname !== prevPathname.current) {
       prevPathname.current = pathname;
-      setPhase((p) => (p === 'covered' ? 'opening' : p));
+      routeReady.current = true;
+      revealWhenReady();
     }
-  }, [pathname]);
+  }, [pathname, revealWhenReady]);
 
   // Drive the phase machine on fixed timers matched to the CSS animation
   // duration, rather than relying on animationend (more resilient).
@@ -36,20 +68,22 @@ export default function PageTransition() {
           router.push(pendingHref.current);
           pendingHref.current = null;
         }
+        routeReady.current = false;
+        coveredAt.current = Date.now();
         setPhase('covered');
       }, SWEEP_MS);
       return () => clearTimeout(t);
     }
     if (phase === 'covered') {
-      // Safety net: if navigation stalls, don't stay covered forever.
-      const t = setTimeout(() => setPhase('opening'), COVERED_TIMEOUT_MS);
+      revealWhenReady(); // in case the route already changed synchronously
+      const t = setTimeout(() => setPhase('opening'), COVERED_TIMEOUT_MS); // stall safety net
       return () => clearTimeout(t);
     }
     if (phase === 'opening') {
       const t = setTimeout(() => setPhase('idle'), SWEEP_MS);
       return () => clearTimeout(t);
     }
-  }, [phase, router]);
+  }, [phase, router, revealWhenReady]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -80,6 +114,7 @@ export default function PageTransition() {
       if (phase !== 'idle') return;
 
       pendingHref.current = url.pathname + url.search + url.hash;
+      setLabel(labelForPath(url.pathname));
       setPhase('closing');
     }
 
@@ -96,7 +131,15 @@ export default function PageTransition() {
 
   return (
     <div className={`page-sweep ${phaseClass}`} aria-hidden>
-      <span className="page-sweep-dot" />
+      {phase === 'covered' && (
+        <span className="page-sweep-label">
+          {label.split('').map((ch, i) => (
+            <span key={i} className="page-sweep-letter" style={{ animationDelay: `${i * 34}ms` }}>
+              {ch === ' ' ? ' ' : ch}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }
