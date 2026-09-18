@@ -100,7 +100,7 @@ function EventBlock({ event, onEdit }: { event: ScheduleEvent; onEdit: (ev: Sche
 
   return (
     <div
-      onClick={() => onEdit(event)}
+      onClick={(e) => { e.stopPropagation(); onEdit(event); }}
       className={`absolute left-0.5 right-0.5 rounded-md border px-1.5 py-1 overflow-hidden cursor-pointer select-none
         ${s.bg} ${s.border}
         ${event.hasConflict ? 'ring-1 ring-orange-400/70 hover:ring-orange-400' : 'hover:brightness-110'}
@@ -341,21 +341,48 @@ function NormalUserPage() {
     const startMinutes = startParts[0] * 60 + startParts[1];
     const endMinutes = endParts[0] * 60 + endParts[1];
     if (isNaN(startMinutes) || isNaN(endMinutes) || endMinutes <= startMinutes) return;
-    setEvents((prev) =>
-      detectConflicts(
-        prev.map((e) =>
-          e.id === editingEvent.id
-            ? { ...e, title: editForm.title.trim() || e.title, day: editForm.day, startMinutes, endMinutes, category: detectCategory(editForm.title) }
-            : e
+
+    if (editingEvent.id === '__new__') {
+      const newEv: ScheduleEvent = {
+        id: uid(),
+        title: editForm.title.trim() || 'New Event',
+        day: editForm.day,
+        startMinutes,
+        endMinutes,
+        category: detectCategory(editForm.title),
+      };
+      setEvents((prev) => detectConflicts([...prev, newEv]));
+    } else {
+      setEvents((prev) =>
+        detectConflicts(
+          prev.map((e) =>
+            e.id === editingEvent.id
+              ? { ...e, title: editForm.title.trim() || e.title, day: editForm.day, startMinutes, endMinutes, category: detectCategory(editForm.title) }
+              : e
+          )
         )
-      )
-    );
+      );
+    }
     setEditingEvent(null);
   }, [editingEvent, editForm]);
 
   const removeEvent = useCallback((id: string) => {
     setEvents((prev) => detectConflicts(prev.filter((e) => e.id !== id)));
     setEditingEvent(null);
+  }, []);
+
+  const handleGridClick = useCallback((day: string, clickY: number) => {
+    const rawMinutes = (clickY / HOUR_PX) * 60 + GRID_START * 60;
+    const snapped = Math.round(rawMinutes / 15) * 15;
+    const startMinutes = Math.max(GRID_START * 60, Math.min(snapped, (GRID_END - 1) * 60));
+    const endMinutes = Math.min(startMinutes + 60, GRID_END * 60);
+    setEditingEvent({ id: '__new__', day, startMinutes, endMinutes, title: '', category: 'personal' });
+    setEditForm({
+      title: '',
+      day,
+      startTime: minsToTimeInput(startMinutes),
+      endTime: minsToTimeInput(endMinutes),
+    });
   }, []);
 
   // ── Chat core ─────────────────────────────────────────────────────────────
@@ -549,7 +576,9 @@ function NormalUserPage() {
           {editingEvent && (
             <div className="shrink-0 px-4 py-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/90 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-2.5">
-                <p className="text-xs font-semibold text-slate-900 dark:text-white flex-1">Edit Event</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white flex-1">
+                  {editingEvent.id === '__new__' ? 'Add Event' : 'Edit Event'}
+                </p>
                 {editingEvent.hasConflict && (
                   <span className="text-[10px] text-orange-400 font-medium">⚠ Conflict — adjust time or day</span>
                 )}
@@ -585,7 +614,9 @@ function NormalUserPage() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={saveEdit} className="flex-1 py-1.5 rounded-lg bg-sky text-white text-xs font-medium hover:bg-sky/90 transition-colors">Save</button>
-                  <button onClick={() => removeEvent(editingEvent.id)} className="py-1.5 px-3 rounded-lg border border-red-500/30 text-red-400 text-xs hover:bg-red-500/10 transition-colors">Remove</button>
+                  {editingEvent.id !== '__new__' && (
+                    <button onClick={() => removeEvent(editingEvent.id)} className="py-1.5 px-3 rounded-lg border border-red-500/30 text-red-400 text-xs hover:bg-red-500/10 transition-colors">Remove</button>
+                  )}
                   <button onClick={() => setEditingEvent(null)} className="py-1.5 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 text-xs hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
                 </div>
               </div>
@@ -593,7 +624,7 @@ function NormalUserPage() {
           )}
 
           {/* Scrollable grid */}
-          <div className="flex-1 overflow-auto min-h-0">
+          <div className="flex-1 overflow-auto min-h-0 relative">
             <div className="flex min-w-[560px]" style={{ height: totalHeight }}>
               <div className="w-12 shrink-0 relative select-none">
                 {HOURS.map((h) => (
@@ -603,7 +634,14 @@ function NormalUserPage() {
                 ))}
               </div>
               {DAYS.map((day) => (
-                <div key={day} className="flex-1 relative border-l border-slate-100 dark:border-white/5 min-w-0">
+                <div
+                  key={day}
+                  className="flex-1 relative border-l border-slate-100 dark:border-white/5 min-w-0 cursor-crosshair"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    handleGridClick(day, e.clientY - rect.top);
+                  }}
+                >
                   {HOURS.map((h) => (
                     <div key={h} className={`absolute left-0 right-0 border-t ${h % 6 === 0 ? 'border-slate-200 dark:border-white/10' : 'border-slate-100 dark:border-white/[0.04]'}`} style={{ top: (h - GRID_START) * HOUR_PX }} />
                   ))}
@@ -613,6 +651,19 @@ function NormalUserPage() {
                 </div>
               ))}
             </div>
+
+            {events.length === 0 && !editingEvent && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-center px-6">
+                  <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </div>
+                  <p className="text-slate-400 dark:text-gray-500 text-xs">Click any time slot to add an event</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

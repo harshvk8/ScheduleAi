@@ -12,6 +12,13 @@ const DAY_OFFSET: Record<string, number> = {
 // Anchor: 2026-01-05 is a Monday — used as the DTSTART base for RRULE events.
 const ANCHOR = new Date(2026, 0, 5); // month is 0-indexed
 
+// How far ahead each event recurs before stopping — a semester-length window,
+// recomputed from "now" on every fetch. Calendar apps re-poll a webcal
+// subscription periodically, so this horizon keeps rolling forward for
+// anyone actively subscribed, while still giving each event a bounded end
+// instead of repeating on every week forever.
+const RECUR_WEEKS = 16;
+
 function addDays(base: Date, n: number): Date {
   const d = new Date(base);
   d.setDate(d.getDate() + n);
@@ -58,6 +65,10 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const events = await getCalendarEventsBySession(sessionId);
 
+  const until = new Date();
+  until.setDate(until.getDate() + RECUR_WEEKS * 7);
+  const untilStr = toIcalDate(until, 23 * 60 + 59);
+
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -82,7 +93,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       `SUMMARY:${esc(ev.title)}`,
       `DTSTART:${toIcalDate(startDate, ev.startMinutes)}`,
       `DTEND:${toIcalDate(endDate, ev.endMinutes)}`,
-      'RRULE:FREQ=WEEKLY',
+      `RRULE:FREQ=WEEKLY;UNTIL=${untilStr}`,
       `CATEGORIES:${esc(ev.category)}`,
       'END:VEVENT',
     );
