@@ -64,6 +64,109 @@ function buildEventsContext(events: CurrentEvent[]): string {
     .join('\n');
 }
 
+// ─── Deterministic schedule analysis ───────────────────────────────────────────
+//
+// The LLM is unreliable at precise time arithmetic (e.g. it once described a
+// class ending exactly when work starts as leaving "an hour before work" —
+// there is zero gap, not an hour). Conflict/adjacency wording is therefore
+// computed here, not left to the model. See SYSTEM prompt rule below.
+
+interface MiniEvent {
+  id: string;
+  day: string;
+  startMinutes: number;
+  endMinutes: number;
+  title: string;
+}
+
+interface ScheduleFlag {
+  kind: 'conflict' | 'back-to-back';
+  subject: string;
+  other: string;
+  atMinutes: number;
+  otherStart: number;
+  otherEnd: number;
+  day: string;
+}
+
+function findScheduleFlags(changed: MiniEvent[], final: MiniEvent[]): ScheduleFlag[] {
+  const flags: ScheduleFlag[] = [];
+  const seenPairs = new Set<string>();
+
+  for (const ev of changed) {
+    for (const other of final) {
+      if (other.id === ev.id || other.day !== ev.day) continue;
+
+      const overlaps = ev.startMinutes < other.endMinutes && ev.endMinutes > other.startMinutes;
+      const endsWhenOtherStarts = ev.endMinutes === other.startMinutes;
+      const startsWhenOtherEnds = other.endMinutes === ev.startMinutes;
+
+      if (!overlaps && !endsWhenOtherStarts && !startsWhenOtherEnds) continue;
+
+      const pairKey = `${[ev.id, other.id].sort().join('~')}:${overlaps ? 'conflict' : 'touch'}`;
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+
+      flags.push({
+        kind: overlaps ? 'conflict' : 'back-to-back',
+        subject: ev.title,
+        other: other.title,
+        atMinutes: overlaps ? 0 : endsWhenOtherStarts ? other.startMinutes : other.endMinutes,
+        otherStart: other.startMinutes,
+        otherEnd: other.endMinutes,
+        day: ev.day,
+      });
+    }
+  }
+  return flags;
+}
+
+function formatDayList(days: string[]): string {
+  if (days.length === 1) return days[0];
+  if (days.length === 2) return `${days[0]} and ${days[1]}`;
+  return `${days.slice(0, -1).join(', ')}, and ${days[days.length - 1]}`;
+}
+
+function summarizeScheduleFlags(flags: ScheduleFlag[]): string {
+  if (flags.length === 0) return '';
+
+  interface Group {
+    kind: ScheduleFlag['kind'];
+    subject: string;
+    other: string;
+    atMinutes: number;
+    otherStart: number;
+    otherEnd: number;
+    days: string[];
+  }
+  const groups = new Map<string, Group>();
+
+  for (const f of flags) {
+    const key = `${f.kind}|${f.subject}|${f.other}|${f.atMinutes}|${f.otherStart}|${f.otherEnd}`;
+    const existing = groups.get(key);
+    if (existing) {
+      if (!existing.days.includes(f.day)) existing.days.push(f.day);
+    } else {
+      groups.set(key, { ...f, days: [f.day] });
+    }
+  }
+
+  // Conflicts (double-booking) are more urgent than back-to-back — surface first.
+  const ordered = [...groups.values()].sort((a, b) =>
+    a.kind === b.kind ? 0 : a.kind === 'conflict' ? -1 : 1
+  );
+
+  return ordered
+    .slice(0, 2)
+    .map((g) => {
+      const dayList = formatDayList(g.days);
+      return g.kind === 'conflict'
+        ? `Heads up: "${g.subject}" overlaps with "${g.other}" (${fmt(g.otherStart)}–${fmt(g.otherEnd)}) on ${dayList}.`
+        : `Heads up: "${g.subject}" and "${g.other}" are back-to-back at ${fmt(g.atMinutes)} on ${dayList} — no buffer between them.`;
+    })
+    .join(' ');
+}
+
 // ─── Tool definition ──────────────────────────────────────────────────────────
 
 const MANAGE_TOOL: Anthropic.Tool = {
@@ -76,7 +179,9 @@ const MANAGE_TOOL: Anthropic.Tool = {
         type: 'string',
         description:
           'Friendly conversational reply (1-3 sentences). Confirm what was done or ask for clarification. ' +
-          'If there are conflicts, mention them.',
+          'Do NOT state gap, buffer, or back-to-back timing yourself (e.g. never say things like ' +
+          '"you\'ll have an hour before X" or "that leaves a gap") — a separate system computes and appends ' +
+          'accurate conflict/adjacency notices after your reply. Just confirm the action in plain terms.',
       },
       operations: {
         type: 'array',
@@ -146,7 +251,9 @@ Rules:
 3. Auto-detect category from title keywords (see tool description).
 4. When editing/deleting, match events by their ID from the current schedule context below.
 5. If multiple events match a vague description, pick the most likely one and mention it.
-6. Warn about time conflicts with existing events when adding.
+6. Never compute or describe gaps, buffers, or back-to-back timing yourself — you are unreliable at exact \
+minute math. A separate deterministic system appends accurate conflict/adjacency notices after your reply. \
+Just confirm what was added/changed/deleted.
 7. Keep replies concise (1-3 sentences). Confirm what was done.
 8. Suggest 1-3 smart follow-up chips based on what the user might want next.`;
 
@@ -271,12 +378,51 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Resolve the post-operation schedule so conflict/adjacency wording reflects
+    // reality instead of whatever the model guessed.
+    const finalExisting: MiniEvent[] = currentEvents
+      .filter((e) => !deletedIds.includes(e.id))
+      .map((e) => {
+        const edit = editedEvents.find((ed) => ed.id === e.id);
+        return edit
+          ? {
+              id: e.id,
+              day: edit.changes.day ?? e.day,
+              startMinutes: edit.changes.startMinutes ?? e.startMinutes,
+              endMinutes: edit.changes.endMinutes ?? e.endMinutes,
+              title: edit.changes.title ?? e.title,
+            }
+          : { id: e.id, day: e.day, startMinutes: e.startMinutes, endMinutes: e.endMinutes, title: e.title };
+      });
+
+    const finalAll: MiniEvent[] = [
+      ...finalExisting,
+      ...addedEvents.map((e) => ({ id: e.id, day: e.day, startMinutes: e.startMinutes, endMinutes: e.endMinutes, title: e.title })),
+    ];
+
+    const changedEvents: MiniEvent[] = [
+      ...addedEvents.map((e) => ({ id: e.id, day: e.day, startMinutes: e.startMinutes, endMinutes: e.endMinutes, title: e.title })),
+      ...finalExisting.filter((e) => editedEvents.some((ed) => ed.id === e.id)),
+    ];
+
+    const scheduleFlags = findScheduleFlags(changedEvents, finalAll);
+    const flagNotice = summarizeScheduleFlags(scheduleFlags);
+
+    const baseReply = (result.reply ?? '').trim();
+    const reply = flagNotice ? `${baseReply} ${flagNotice}`.trim() : baseReply;
+
+    const suggestions: string[] = Array.isArray(result.suggestions) ? [...result.suggestions] : [];
+    const backToBack = scheduleFlags.find((f) => f.kind === 'back-to-back');
+    if (backToBack && suggestions.length < 3) {
+      suggestions.push(`Add a buffer before "${backToBack.other}"`);
+    }
+
     return NextResponse.json({
-      reply: result.reply ?? '',
+      reply,
       addedEvents,
       editedEvents,
       deletedIds,
-      suggestions: result.suggestions ?? [],
+      suggestions,
     } satisfies CalendarChatResponse);
   } catch (err) {
     console.error('[/api/calendar-chat] Claude error:', err);

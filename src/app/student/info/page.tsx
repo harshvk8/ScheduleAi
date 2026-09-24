@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { getUniversity } from '@/data/universities';
+import { getUniversity, buildCustomUniversity, OTHER_UNIVERSITY_ID } from '@/data/universities';
 import { saveUserProfile, getUserProfile } from '@/lib/db';
 import {
   createUserWithEmailAndPassword,
@@ -322,7 +322,11 @@ function StudentInfoForm() {
   const router = useRouter();
 
   const universityId = params.get('university') ?? '';
-  const university = getUniversity(universityId);
+  const isCustomUniversity = universityId === OTHER_UNIVERSITY_ID;
+  const customName = params.get('name') ?? '';
+  const university = isCustomUniversity
+    ? (customName.trim() ? buildCustomUniversity(customName) : undefined)
+    : getUniversity(universityId);
 
   const [mode, setMode] = useState<'quick' | 'create' | 'signin'>('quick');
 
@@ -353,6 +357,14 @@ function StudentInfoForm() {
     return null;
   }
 
+  const emailPlaceholder = university.domain ? `you@${university.domain}` : 'you@youruniversity.edu';
+  const quickEmailHint = university.domain
+    ? `If provided, must end with @${university.domain}`
+    : "If provided, just needs to be a valid email address";
+  const createEmailHint = university.domain
+    ? `Must end with @${university.domain}`
+    : "We couldn't verify a domain for this school, so any valid email works";
+
   const clearError = (field: string) =>
     setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
 
@@ -369,7 +381,7 @@ function StudentInfoForm() {
     const trimmedEmail = quickEmail.trim();
     if (trimmedEmail) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) e.quickEmail = 'Enter a valid email address';
-      else if (!trimmedEmail.toLowerCase().endsWith(`@${university.domain}`)) e.quickEmail = `Must end with @${university.domain}`;
+      else if (!isCustomUniversity && !trimmedEmail.toLowerCase().endsWith(`@${university.domain}`)) e.quickEmail = `Must end with @${university.domain}`;
     }
     if (!agreedToTerms) e.terms = 'You must agree to the Terms & Conditions to continue';
 
@@ -386,7 +398,7 @@ function StudentInfoForm() {
         name: 'Guest Student',
         email: trimmedEmail.toLowerCase(),
         studentId: '',
-        universityId,
+        universityId: university.id,
         universityName: university.name,
         domain: university.domain,
       };
@@ -412,7 +424,7 @@ function StudentInfoForm() {
 
     if (!name.trim() || name.trim().length < 2) e.name = 'Enter your full name (at least 2 characters)';
     if (!email.trim()) e.email = 'Enter your university email';
-    else if (!email.toLowerCase().endsWith(`@${university.domain}`)) e.email = `Must end with @${university.domain}`;
+    else if (!isCustomUniversity && !email.toLowerCase().endsWith(`@${university.domain}`)) e.email = `Must end with @${university.domain}`;
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email address';
     if (!studentId.trim()) e.studentId = 'Enter your student ID';
     else if (!/^[A-Za-z0-9-_]+$/.test(studentId.trim())) e.studentId = 'ID can only contain letters, numbers, and hyphens';
@@ -430,7 +442,7 @@ function StudentInfoForm() {
         email: email.trim().toLowerCase(),
         name: name.trim(),
         role: 'student' as const,
-        universityId,
+        universityId: university.id,
         universityName: university.name,
         studentId: studentId.trim().toUpperCase(),
         domain: university.domain,
@@ -514,7 +526,9 @@ function StudentInfoForm() {
               <p className="text-xs text-slate-400 dark:text-slate-500">Selected university</p>
               <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{university.name}</p>
             </div>
-            <span className="ml-auto text-xs text-slate-500 dark:text-slate-600 shrink-0">{university.domain}</span>
+            {university.domain && (
+              <span className="ml-auto text-xs text-slate-500 dark:text-slate-600 shrink-0">{university.domain}</span>
+            )}
           </div>
 
           {/* ── Quick start (guest) ── */}
@@ -525,8 +539,8 @@ function StudentInfoForm() {
                 Jump straight into the chatbot. Your university email is optional — add it if you want, or leave it blank.
               </p>
               <form onSubmit={handleQuickContinue} noValidate className="space-y-5">
-                <Field label="University email (optional)" hint={`If provided, must end with @${university.domain}`} error={errors.quickEmail}>
-                  <input type="email" placeholder={`you@${university.domain}`} value={quickEmail}
+                <Field label="University email (optional)" hint={quickEmailHint} error={errors.quickEmail}>
+                  <input type="email" placeholder={emailPlaceholder} value={quickEmail}
                     onChange={(e) => { setQuickEmail(e.target.value); clearError('quickEmail'); }}
                     autoComplete="email" className={inputCls(!!errors.quickEmail)} />
                 </Field>
@@ -603,8 +617,8 @@ function StudentInfoForm() {
                     onChange={(e) => { setName(e.target.value); clearError('name'); }}
                     autoComplete="name" className={inputCls(!!errors.name)} />
                 </Field>
-                <Field label="University email" hint={`Must end with @${university.domain}`} error={errors.email}>
-                  <input type="email" placeholder={`you@${university.domain}`} value={email}
+                <Field label="University email" hint={createEmailHint} error={errors.email}>
+                  <input type="email" placeholder={emailPlaceholder} value={email}
                     onChange={(e) => { setEmail(e.target.value); clearError('email'); }}
                     autoComplete="email" className={inputCls(!!errors.email)} />
                 </Field>
@@ -681,7 +695,7 @@ function StudentInfoForm() {
               <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Sign in with your ScheduleAI student account.</p>
               <form onSubmit={handleReturnSubmit} noValidate className="space-y-5">
                 <Field label="University email" error={undefined}>
-                  <input type="email" placeholder={`you@${university.domain}`} value={retEmail}
+                  <input type="email" placeholder={emailPlaceholder} value={retEmail}
                     onChange={(e) => { setRetEmail(e.target.value); setResetSent(false); }}
                     autoComplete="email" className={inputCls(false)} />
                 </Field>

@@ -19,3 +19,13 @@ export const UNIVERSITIES: University[] = [
 export function getUniversity(id: string): University | undefined {
   return UNIVERSITIES.find((u) => u.id === id);
 }
+
+export const OTHER_UNIVERSITY_ID = 'other';
+
+// Custom, user-typed university (not in our list). No known domain, so we
+// can't enforce an @school.edu email suffix for these — see student/info/page.tsx.
+export function buildCustomUniversity(name: string): University {
+  const trimmed = name.trim();
+  const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return { id: `${OTHER_UNIVERSITY_ID}-${slug || 'university'}`, name: trimmed, location: '', domain: '' };
+}

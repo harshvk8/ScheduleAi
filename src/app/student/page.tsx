@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { UNIVERSITIES } from '@/data/universities';
+import { UNIVERSITIES, OTHER_UNIVERSITY_ID } from '@/data/universities';
 
 export default function StudentPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [otherName, setOtherName] = useState('');
   const router = useRouter();
 
   const filtered = UNIVERSITIES.filter((u) =>
@@ -15,10 +16,22 @@ export default function StudentPage() {
     u.location.toLowerCase().includes(search.toLowerCase())
   );
 
+  const isOther = selected === OTHER_UNIVERSITY_ID;
   const selectedUniversity = UNIVERSITIES.find((u) => u.id === selected);
+  const canContinue = isOther ? otherName.trim().length > 1 : !!selected;
+
+  const selectOther = () => {
+    setSelected(OTHER_UNIVERSITY_ID);
+    if (!otherName.trim()) setOtherName(search.trim());
+  };
 
   const handleContinue = () => {
-    if (selected) {
+    if (isOther) {
+      const trimmed = otherName.trim();
+      if (trimmed.length > 1) {
+        router.push(`/student/info?university=${OTHER_UNIVERSITY_ID}&name=${encodeURIComponent(trimmed)}`);
+      }
+    } else if (selected) {
       router.push(`/student/info?university=${selected}`);
     }
   };
@@ -92,20 +105,47 @@ export default function StudentPage() {
               </button>
             ))}
             {filtered.length === 0 && (
-              <div className="text-slate-400 dark:text-slate-500 text-sm text-center py-10">
+              <div className="text-slate-400 dark:text-slate-500 text-sm text-center py-6">
                 No universities found for "{search}"
               </div>
             )}
+
+            {/* Not listed — type it in */}
+            <div
+              onClick={() => !isOther && selectOther()}
+              className={`w-full text-left px-4 py-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
+                isOther
+                  ? 'border-sky/50 bg-sky/10 text-sky-700 dark:text-white'
+                  : 'border-dashed border-slate-300 dark:border-white/15 bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-white/25 hover:bg-slate-50 dark:hover:bg-slate-900/70'
+              }`}
+            >
+              <p className="text-sm font-medium">My university isn't listed</p>
+              {isOther ? (
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Type your university name..."
+                  value={otherName}
+                  onChange={(e) => setOtherName(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-2 w-full px-3 py-2 rounded-lg border border-sky/30 bg-white dark:bg-slate-900/70 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky/30 text-sm"
+                />
+              ) : (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Tap to type your school's name</p>
+              )}
+            </div>
           </div>
 
           {/* Continue button */}
           <button
             onClick={handleContinue}
-            disabled={!selected}
+            disabled={!canContinue}
             className="w-full py-3.5 rounded-xl bg-sky text-white font-semibold text-sm hover:bg-sky/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
           >
-            {selectedUniversity ? `Continue with ${selectedUniversity.name.split(' ')[0]}` : 'Select a university to continue'}
-            {selected && (
+            {canContinue
+              ? `Continue with ${isOther ? otherName.trim() : selectedUniversity!.name.split(' ')[0]}`
+              : 'Select a university to continue'}
+            {canContinue && (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m9 18 6-6-6-6" />
               </svg>
